@@ -1,65 +1,87 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
+import React, { useState, useEffect } from "react";
+import { api } from "./services/api";
+import { Navbar } from "./components/Shared";
+import PublicPortal from "./views/PublicPortal";
+import LoginPortal from "./views/LoginPortal";
+import NgoDashboard from "./views/NgoDashboard";
+import VolunteerPortal from "./views/VolunteerPortal";
 
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Volunteers from './pages/Volunteers';
-import Needs from './pages/Needs';
-import Assignments from './pages/Assignments';
-import Matching from './pages/Matching';
-import Reports from './pages/Reports';
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [currentView, setCurrentView] = useState("public");
 
-function App() {
+  // Reload current user state from localStorage
+  const loadUser = () => {
+    const currentUser = api.auth.getCurrentUser();
+    setUser(currentUser);
+    
+    // Redirect logged in users to their dashboards
+    if (currentUser) {
+      if (currentUser.role === "admin") {
+        setCurrentView("ngo");
+      } else if (currentUser.role === "volunteer") {
+        setCurrentView("volunteer");
+      }
+    } else {
+      setCurrentView("public");
+    }
+  };
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const handleLogout = () => {
+    api.auth.logout();
+    setUser(null);
+    setCurrentView("public");
+  };
+
+  const handleViewChange = (newView) => {
+    // Guards for authenticated views
+    if (newView === "ngo" && (!user || user.role !== "admin")) {
+      setCurrentView("login");
+      return;
+    }
+    if (newView === "volunteer" && (!user || user.role !== "volunteer")) {
+      setCurrentView("login");
+      return;
+    }
+    setCurrentView(newView);
+  };
+
   return (
-    <AuthProvider>
-      <Router>
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#0f172a',
-              color: '#f1f5f9',
-              borderRadius: '16px',
-              border: '1px solid rgba(255,255,255,0.05)',
-              fontSize: '14px',
-              fontWeight: '600',
-              padding: '14px 20px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            },
-            success: {
-              iconTheme: { primary: '#14b8a6', secondary: '#0f172a' },
-            },
-            error: {
-              iconTheme: { primary: '#f43f5e', secondary: '#0f172a' },
-            },
-          }}
-        />
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+    <div className="min-h-screen flex flex-col">
+      {/* Floating Global Navbar */}
+      <Navbar 
+        user={user} 
+        onLogout={handleLogout} 
+        currentView={currentView} 
+        onViewChange={handleViewChange} 
+      />
 
-          {/* Protected Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/volunteers" element={<Volunteers />} />
-            <Route path="/needs" element={<Needs />} />
-            <Route path="/assignments" element={<Assignments />} />
-            <Route path="/matching" element={<Matching />} />
-            <Route path="/reports" element={<Reports />} />
-          </Route>
+      {/* Main View Port router */}
+      <div className="flex-grow">
+        {currentView === "public" && <PublicPortal />}
+        
+        {currentView === "login" && (
+          <LoginPortal onLoginSuccess={loadUser} />
+        )}
+        
+        {currentView === "ngo" && user?.role === "admin" && (
+          <NgoDashboard />
+        )}
+        
+        {currentView === "volunteer" && user?.role === "volunteer" && (
+          <VolunteerPortal />
+        )}
+      </div>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </AuthProvider>
+      {/* Premium Footer */}
+      <footer className="py-8 mt-12 border-t border-gray-800/40 text-center text-xs text-gray-500">
+        <p>&copy; 2026 ReliefSync AI Coordination Network. All rights reserved.</p>
+        <p className="mt-1 text-[10px] text-gray-600">Powering decentralized community emergency response with real-time AI classification triage.</p>
+      </footer>
+    </div>
   );
 }
-
-export default App;

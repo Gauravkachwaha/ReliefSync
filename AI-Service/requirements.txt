@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+transformers>=4.49,<6
+torch
+safetensors
+sentence-transformers>=3.4,<6
+redis>=5,<8

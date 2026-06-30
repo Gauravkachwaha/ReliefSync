@@ -1,63 +1,16 @@
-# ReliefSync AI — Frontend
+# React + Vite
 
-Web dashboard for **ReliefSync AI**: register, sign in, and manage volunteers, needs, assignments, matching, and community reports against the ReliefSync REST API.
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-This package is a **React + Vite** single-page application. The HTTP API is implemented in the sibling [`../Backend`](../Backend) project (Express + MongoDB).
+Currently, two official plugins are available:
 
-## Prerequisites
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-- **Node.js** 18+ (20+ recommended)
-- **Backend** running locally (default `http://localhost:5000`) or a deployed API you can point this app at
+## React Compiler
 
-## Quick start
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-```bash
-cd Frontend
-npm install
-cp .env.example .env   # optional; defaults match local backend
-npm run dev
-```
+## Expanding the Oxlint configuration
 
-The dev server defaults to **http://localhost:5173** (Vite). Open that URL in a browser.
-
-## Scripts
-
-| Command        | Description                    |
-| -------------- | ------------------------------ |
-| `npm run dev`  | Start Vite dev server with HMR |
-| `npm run build`| Production build → `dist/`     |
-| `npm run preview` | Serve the production build locally |
-| `npm run lint` | Run ESLint                     |
-
-## Configuration
-
-- **`VITE_API_URL`** — Base URL for API requests (must include the `/api` prefix your server mounts). Set in `.env` (see `.env.example`). Implemented in `src/api/axios.js`.
-- If unset, the client uses `http://localhost:5000/api`.
-
-## Stack
-
-- React 19, React Router 7
-- Tailwind CSS 3, PostCSS, Autoprefixer
-- Axios (JWT on requests; 401 clears session and sends user to `/login`)
-- Framer Motion, Lucide React, react-hot-toast
-
-## App structure
-
-| Area        | Role |
-| ----------- | ---- |
-| `src/pages/` | Route screens: login, register, dashboard, volunteers, needs, assignments, matching, reports |
-| `src/components/` | Shared UI (e.g. sidebar, protected route) |
-| `src/context/AuthContext.jsx` | Auth state and token handling |
-| `src/api/axios.js` | Shared Axios instance, JWT interceptors, and API base URL |
-
-## Production build
-
-```bash
-npm run build
-```
-
-Static assets are emitted under `dist/`. Serve `dist/` with any static host or reverse proxy, and ensure `VITE_API_URL` is set at **build time** to your production API URL (Vite inlines `import.meta.env` values into the bundle).
-
-## Backend
-
-The **supported** API is the sibling **`Backend/`** (or `backend/`) Express app. This SPA only talks to it over HTTP using `VITE_API_URL`.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.

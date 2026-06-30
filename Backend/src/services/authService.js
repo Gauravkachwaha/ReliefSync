@@ -6,16 +6,33 @@ import ngoRepository from "../repositories/ngoRepository.js";
 const JWT_SECRET = process.env.JWT_SECRET;
 
 class AuthService {
-  // this is for creation of the ngo and the user of the ngo
+  createToken(user) {
+    const payload = {
+      id: user._id,
+      role: user.role,
+    };
+
+    // Super Admin has no NGO. Admin, coordinator, and volunteer do.
+    if (user.role !== "super_admin" && user.ngoId) {
+      payload.ngoId = user.ngoId._id || user.ngoId;
+    }
+
+    return jwt.sign(payload, JWT_SECRET, {
+      expiresIn: "7d",
+    });
+  }
+
   async registerNgo(ngoData, adminData) {
-    // Check if NGO already exists
     const existingNgo = await ngoRepository.findByEmail(ngoData.email);
-    if (existingNgo) throw new Error("NGO with this email already exists");
+
+    if (existingNgo) {
+      throw new Error("NGO with this email already exists");
+    }
 
     const ngo = await ngoRepository.create(ngoData);
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
+
     const hashedPassword = await bcrypt.hash(adminData.password, salt);
 
     const admin = await userRepository.create({
@@ -25,37 +42,44 @@ class AuthService {
       ngoId: ngo._id,
     });
 
-    // Update NGO with createdBy
     ngo.createdBy = admin._id;
     await ngo.save();
 
-    const token = jwt.sign(
-      { id: admin._id, role: "admin", ngoId: ngo._id },
-      JWT_SECRET,
-      { expiresIn: "7d" },
-    );
+    const token = this.createToken(admin);
 
-    return { ngo, admin, token };
+    return {
+      ngo,
+      admin,
+      token,
+    };
   }
 
   async login(email, password) {
     const user = await userRepository.findByEmail(email);
-    if (!user || !user.isActive) throw new Error("Invalid credentials");
+
+    if (!user || !user.isActive) {
+      throw new Error("Invalid credentials");
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new Error("Invalid credentials");
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role, ngoId: user.ngoId._id },
-      JWT_SECRET,
-      { expiresIn: "7d" },
-    );
+    if (!isMatch) {
+      throw new Error("Invalid credentials");
+    }
 
-    return { user, token };
+    const token = this.createToken(user);
+
+    return {
+      user,
+      token,
+    };
   }
 
   verifyToken(token) {
-    if (!token) throw new Error("No token provided");
+    if (!token) {
+      throw new Error("No token provided");
+    }
+
     return jwt.verify(token, JWT_SECRET);
   }
 }

@@ -5,8 +5,13 @@ class UserRepository {
     return await User.create(userData);
   }
 
+  // Password is selected only here because login needs it.
   async findByEmail(email) {
-    return await User.findOne({ email }).populate("ngoId");
+    return await User.findOne({
+      email: String(email).toLowerCase(),
+    })
+      .select("+password")
+      .populate("ngoId");
   }
 
   async findById(id) {
@@ -15,6 +20,10 @@ class UserRepository {
 
   async findByNgoId(ngoId) {
     return await User.find({ ngoId });
+  }
+
+  async deleteById(id) {
+    return await User.findByIdAndDelete(id);
   }
 }
 

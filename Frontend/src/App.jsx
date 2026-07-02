@@ -5,6 +5,7 @@ import PublicPortal from "./views/PublicPortal";
 import LoginPortal from "./views/LoginPortal";
 import NgoDashboard from "./views/NgoDashboard";
 import VolunteerPortal from "./views/VolunteerPortal";
+import SuperAdminDashboard from "./views/SuperAdminDashboard";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -21,6 +22,8 @@ export default function App() {
         setCurrentView("ngo");
       } else if (currentUser.role === "volunteer") {
         setCurrentView("volunteer");
+      } else if (currentUser.role === "super_admin") {
+        setCurrentView("super-admin");
       }
     } else {
       setCurrentView("public");
@@ -44,6 +47,10 @@ export default function App() {
       return;
     }
     if (newView === "volunteer" && (!user || user.role !== "volunteer")) {
+      setCurrentView("login");
+      return;
+    }
+    if (newView === "super-admin" && (!user || user.role !== "super_admin")) {
       setCurrentView("login");
       return;
     }
@@ -74,6 +81,10 @@ export default function App() {
         
         {currentView === "volunteer" && user?.role === "volunteer" && (
           <VolunteerPortal />
+        )}
+        
+        {currentView === "super-admin" && user?.role === "super_admin" && (
+          <SuperAdminDashboard />
         )}
       </div>
 

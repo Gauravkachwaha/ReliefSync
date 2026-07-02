@@ -124,6 +124,7 @@ class ComplaintRepository {
         },
         {
           $set: {
+            updatedAt: "$$NOW",
             status: {
               $cond: [
                 {
@@ -144,6 +145,7 @@ class ComplaintRepository {
       ],
       {
         new: true,
+        timestamps: false, // We set updatedAt manually in the pipeline above
       },
     );
   }

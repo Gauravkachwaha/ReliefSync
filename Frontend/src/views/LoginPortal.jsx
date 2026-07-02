@@ -39,6 +39,19 @@ export default function LoginPortal({ onLoginSuccess }) {
 
   const toggleCat = (v) => setNgoCats(p => p.includes(v) ? p.filter(c => c !== v) : [...p, v]);
 
+  const handlePrefill = (role) => {
+    if (role === "admin") {
+      setEmail("ngo@reliefsync.local");
+      setPassword("ngo12345");
+    } else if (role === "volunteer") {
+      setEmail("volunteer@reliefsync.local");
+      setPassword("volunteer12345");
+    } else if (role === "super_admin") {
+      setEmail("superadmin@reliefsync.local");
+      setPassword("ChangeThisPassword_123!");
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setBusy(true); setErr("");
@@ -87,6 +100,11 @@ export default function LoginPortal({ onLoginSuccess }) {
 
       {mode === "login" ? (
         <Card title="Sign In" subtitle="Enter your registered credentials.">
+          <div className="flex flex-wrap gap-2 justify-center my-4 p-2 bg-black/20 rounded-xl border border-gray-800/40">
+            <button type="button" onClick={() => handlePrefill("admin")} className="btn btn-sm btn-secondary text-[11px] py-1 px-3">Demo NGO Admin</button>
+            <button type="button" onClick={() => handlePrefill("volunteer")} className="btn btn-sm btn-secondary text-[11px] py-1 px-3">Demo Volunteer</button>
+            <button type="button" onClick={() => handlePrefill("super_admin")} className="btn btn-sm btn-secondary text-[11px] py-1 px-3">Demo Super Admin</button>
+          </div>
           <form onSubmit={handleLogin} className="stack stack-md" style={{ marginTop: 12 }}>
             {err && <div className="info-box info-box-danger text-sm">{err}</div>}
 

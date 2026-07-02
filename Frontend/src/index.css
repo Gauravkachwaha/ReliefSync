@@ -4,30 +4,30 @@
    DESIGN TOKENS
    ====================================================== */
 :root {
-  --bg-main: hsl(218, 18%, 9%);
-  --bg-card: hsla(214, 18%, 15%, 0.74);
-  --bg-card-solid: hsl(214, 18%, 13%);
-  --bg-input: hsla(210, 18%, 7%, 0.72);
-  --bg-input-focus: hsla(210, 18%, 7%, 0.92);
-  --border: hsla(184, 62%, 52%, 0.14);
-  --border-hover: hsla(184, 62%, 52%, 0.32);
-  --primary: hsl(8, 82%, 61%);
-  --primary-glow: hsla(8, 82%, 61%, 0.22);
-  --primary-hover: hsl(8, 86%, 66%);
-  --accent: hsl(177, 76%, 48%);
-  --accent-glow: hsla(180, 100%, 48%, 0.25);
-  --success: hsl(142, 70%, 50%);
-  --success-bg: hsla(142, 70%, 50%, 0.12);
-  --warning: hsl(38, 92%, 50%);
-  --warning-bg: hsla(38, 92%, 50%, 0.12);
-  --danger: hsl(350, 89%, 60%);
-  --danger-bg: hsla(350, 89%, 60%, 0.12);
-  --info: hsl(217, 91%, 65%);
-  --info-bg: hsla(217, 91%, 60%, 0.1);
-  --text: hsl(210, 40%, 98%);
-  --text-secondary: hsl(217, 15%, 65%);
-  --text-dim: hsl(217, 10%, 45%);
-  --surface-dark: hsla(223, 20%, 6%, 0.6);
+  --bg-main: hsl(222, 24%, 6%);
+  --bg-card: hsla(220, 20%, 10%, 0.6);
+  --bg-card-solid: hsl(220, 20%, 9%);
+  --bg-input: hsla(220, 24%, 4%, 0.6);
+  --bg-input-focus: hsla(220, 24%, 3%, 0.8);
+  --border: hsla(222, 20%, 16%, 0.5);
+  --border-hover: hsla(187, 80%, 50%, 0.25);
+  --primary: hsl(263, 85%, 64%);
+  --primary-glow: hsla(263, 85%, 64%, 0.18);
+  --primary-hover: hsl(263, 90%, 68%);
+  --accent: hsl(187, 92%, 46%);
+  --accent-glow: hsla(187, 92%, 46%, 0.18);
+  --success: hsl(142, 70%, 45%);
+  --success-bg: hsla(142, 70%, 45%, 0.08);
+  --warning: hsl(38, 92%, 48%);
+  --warning-bg: hsla(38, 92%, 48%, 0.08);
+  --danger: hsl(350, 89%, 56%);
+  --danger-bg: hsla(350, 89%, 56%, 0.08);
+  --info: hsl(217, 91%, 60%);
+  --info-bg: hsla(217, 91%, 60%, 0.08);
+  --text: hsl(220, 40%, 98%);
+  --text-secondary: hsl(220, 14%, 72%);
+  --text-dim: hsl(220, 10%, 48%);
+  --surface-dark: hsla(222, 24%, 4%, 0.8);
 
   font-family: 'Plus Jakarta Sans', sans-serif;
   color: var(--text);

@@ -1,6 +1,7 @@
 import assignmentRepository from "../repositories/assignmentRepository.js";
 import complaintRepository from "../repositories/complaintRepository.js";
 import volunteerRepository from "../repositories/volunteerRepository.js";
+import ngoImpactService from "./ngoImpactService.js";
 
 const allowedStatuses = [
   "assigned",
@@ -196,6 +197,11 @@ class VolunteerAssignmentService {
             ngoId,
           );
         }
+
+        // Recalculate NGO impact score
+        ngoImpactService.recalculateNgoImpact(ngoId).catch((err) => {
+          console.error("NGO impact recalculation background error:", err.message);
+        });
       }
     }
 

@@ -106,12 +106,10 @@ const assignmentSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-assignmentSchema.pre("validate", function validateAssignment(next) {
+assignmentSchema.pre("validate", async function validateAssignment() {
   if (!this.needId && !this.complaintId) {
     this.invalidate("complaintId", "Either needId or complaintId is required");
   }
-
-  next();
 });
 
 // One volunteer cannot receive two assignments for one complaint.

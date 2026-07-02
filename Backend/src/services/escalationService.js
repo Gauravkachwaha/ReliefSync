@@ -4,6 +4,7 @@ import NgoCaseOffer from "../models/NgoCaseOffer.js";
 import VolunteerOffer from "../models/VolunteerOffer.js";
 
 import notificationService from "./notificationService.js";
+import agentLogService from "./agentLogService.js";
 
 class EscalationService {
   isEnabled() {
@@ -148,6 +149,20 @@ class EscalationService {
         `⚠️ Escalation was created but notification could not be queued: ${error.message}`,
       );
     }
+
+    await agentLogService.logRun({
+      complaintId: complaint._id,
+      agentType: "Escalation Agent",
+      toolCalls: [
+        {
+          toolName: "escalateComplaint",
+          args: { complaintId: complaint._id, reason },
+          result: { escalationId: escalation._id, priority: escalation.priority }
+        }
+      ],
+      decisionSummary: `Escalated complaint because of reason: ${reason}. Escalation priority: ${escalation.priority}. Notification sent to Super Admin.`,
+      status: "SUCCESS"
+    });
 
     console.log(
       `🚨 Escalation created: ${reason} for ${complaint.complaintId}`,

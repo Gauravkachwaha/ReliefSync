@@ -18,7 +18,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // CORS: local dev + production frontends (comma-separated FRONTEND_URL in .env)
-const defaultOrigins = ["http://localhost:3000", "http://localhost:5173"];
+const defaultOrigins = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"];
 
 const extraOrigins = (process.env.FRONTEND_URL || "")
   .split(",")
@@ -58,6 +58,11 @@ app.use("/api/ngo", (await import("./src/routes/ngo.js")).default);
 app.use(
   "/api/public/complaints",
   (await import("./src/routes/publicComplaint.js")).default,
+);
+
+app.use(
+  "/api/public/ngos",
+  (await import("./src/routes/publicNgo.js")).default,
 );
 
 app.use("/api/volunteers", (await import("./src/routes/volunteer.js")).default);

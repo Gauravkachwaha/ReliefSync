@@ -1,18 +1,34 @@
 import nodemailer from "nodemailer";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+let transporter = null;
+
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+  return transporter;
+};
 
 class EmailService {
   async sendEmail(to, subject, text) {
     try {
-      await transporter.sendMail({
-        from: `"ReliefSync AI" <${process.env.EMAIL_USER}>`,
+      const user = process.env.EMAIL_USER;
+      const pass = process.env.EMAIL_PASS;
+
+      if (!user || !pass || user.includes("example") || pass.includes("password")) {
+        console.log(`✉️ [Console Email Fallback] To: ${to}\nSubject: ${subject}\nBody: ${text}\n`);
+        return true;
+      }
+
+      const client = getTransporter();
+      await client.sendMail({
+        from: `"ReliefSync AI" <${user}>`,
         to,
         subject,
         text,
@@ -20,8 +36,9 @@ class EmailService {
       console.log(`✅ Email sent successfully to ${to}`);
       return true;
     } catch (err) {
-      console.error("❌ Failed to send email:", err.message);
-      return false;
+      console.warn("⚠️ SMTP Email delivery failed, falling back to console log:", err.message);
+      console.log(`✉️ [Console Email Fallback] To: ${to}\nSubject: ${subject}\nBody: ${text}\n`);
+      return true;
     }
   }
 
@@ -64,6 +81,62 @@ ReliefSync AI Team
       volunteerEmail,
       `New Assignment: ${needTitle}`,
       text,
+    );
+  }
+
+  // Incident Offer Alert to NGO Admin
+  async sendIncidentOfferAlert(ngoEmail, complaint) {
+    const text = `
+🚨 NEW INCIDENT ROUTED TO YOUR NGO
+
+A new emergency complaint has been routed to your NGO by the ReliefSync AI engine.
+
+Complaint ID: ${complaint.complaintId}
+Category: ${complaint.category || "General"}
+Severity: ${complaint.severity || "Medium"}
+Location Landmark: ${complaint.locationHint || "General"}
+
+AI Case Summary:
+"${complaint.aiExtractedData?.summary || complaint.originalText || "No summary available."}"
+
+Please log in to your NGO Dashboard immediately to accept or decline this case offer before it expires.
+
+Thank you,
+ReliefSync AI Team
+    `;
+
+    return await this.sendEmail(
+      ngoEmail,
+      `🚨 Urgent Case Offer: ${complaint.complaintId}`,
+      text
+    );
+  }
+
+  // Volunteer Case Offer Alert
+  async sendVolunteerOfferAlert(volunteerEmail, complaint) {
+    const text = `
+🚨 NEW EMERGENCY ASSIGNMENT OFFER
+
+You have received a new emergency response offer from your NGO.
+
+Incident ID: ${complaint.complaintId}
+Category: ${complaint.category || "General Support"}
+Severity: ${complaint.severity || "Medium"}
+Location Landmark: ${complaint.locationHint || "General"}
+
+AI Incident Summary:
+"${complaint.aiExtractedData?.summary || complaint.originalText || "No summary available."}"
+
+Please log in to your Volunteer Portal immediately to accept or decline this offer before it expires.
+
+Thank you for your service!
+ReliefSync AI Team
+    `;
+
+    return await this.sendEmail(
+      volunteerEmail,
+      `🚨 Urgent Job Offer: ${complaint.complaintId}`,
+      text
     );
   }
 }

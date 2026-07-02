@@ -28,7 +28,7 @@ const ngoSchema = new mongoose.Schema(
     verificationStatus: {
       type: String,
       enum: ["PENDING", "VERIFIED", "REJECTED"],
-      default: "PENDING",
+      default: "VERIFIED",
       index: true,
     },
 

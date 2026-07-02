@@ -1,6 +1,8 @@
 import complaintRepository from "../repositories/complaintRepository.js";
 import volunteerRepository from "../repositories/volunteerRepository.js";
 import volunteerOfferRepository from "../repositories/volunteerOfferRepository.js";
+import agentLogService from "./agentLogService.js";
+import emailService from "./emailService.js";
 
 const MAX_PENDING_VOLUNTEER_OFFERS = 7;
 const OFFER_BUFFER = 2;
@@ -281,6 +283,13 @@ class VolunteerMatchingService {
         });
 
         createdOffers.push(offer);
+
+        // Send email alert to volunteer
+        if (candidate.volunteer && candidate.volunteer.email) {
+          emailService.sendVolunteerOfferAlert(candidate.volunteer.email, complaint).catch((err) => {
+            console.error(`❌ Background email to volunteer ${candidate.volunteer.email} failed:`, err.message);
+          });
+        }
       } catch (error) {
         if (error?.code === 11000) {
           continue;
@@ -295,6 +304,27 @@ class VolunteerMatchingService {
     if (createdOffers.length > 0 && complaint.status === "NGO_ACCEPTED") {
       updatedComplaint = await complaintRepository.updateById(complaint._id, {
         status: "VOLUNTEER_MATCHING",
+      });
+    }
+
+    if (createdOffers.length > 0) {
+      await agentLogService.logRun({
+        complaintId: updatedComplaint._id,
+        agentType: "Volunteer Dispatch Agent",
+        toolCalls: [
+          {
+            toolName: "getEligibleVolunteers",
+            args: { ngoId: updatedComplaint.acceptedNgoId, skills: updatedComplaint.requiredSkills },
+            result: selectedCandidates.map(c => ({ volunteerId: c.volunteer._id, name: c.volunteer.name, matchScore: c.matchScore }))
+          },
+          {
+            toolName: "createVolunteerOffers",
+            args: { complaintId: updatedComplaint._id, volunteerIds: selectedCandidates.map(c => c.volunteer._id) },
+            result: { offersCreated: createdOffers.length }
+          }
+        ],
+        decisionSummary: `Dispatched volunteer offers to ${createdOffers.length} eligible volunteers based on score and availability.`,
+        status: "SUCCESS"
       });
     }
 

@@ -4,19 +4,21 @@ import path from "path";
 
 const createTextReport = async (req, res, next) => {
   try {
-    const { title, rawText } = req.body;
+    const { title, rawText, text } = req.body;
     const ngoId = req.user.ngoId;
     const userId = req.user.id;
 
-    if (!title || !rawText) {
+    const reportText = rawText || text;
+
+    if (!title || !reportText) {
       return res.status(400).json({
         success: false,
-        message: "Title and rawText are required",
+        message: "Title and description content (text) are required",
       });
     }
 
     const report = await reportService.createTextReport(
-      { title, rawText },
+      { title, rawText: reportText },
       ngoId,
       userId,
     );

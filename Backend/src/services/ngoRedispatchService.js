@@ -5,6 +5,7 @@ import NgoCaseOffer from "../models/NgoCaseOffer.js";
 import { getNgoOfferExpiryConfig } from "../config/ngoOfferExpiryConfig.js";
 import { getNgoRedispatchConfig } from "../config/ngoRedispatchConfig.js";
 import notificationService from "./notificationService.js";
+import emailService from "./emailService.js";
 
 const ROUTABLE_COMPLAINT_STATUSES = ["READY_FOR_ROUTING", "NGOS_NOTIFIED"];
 
@@ -264,6 +265,15 @@ class NgoRedispatchService {
     trigger,
     offers,
   }) {
+    // Send email alert to each NGO
+    for (const { ngo } of offers) {
+      if (ngo && ngo.email) {
+        emailService.sendIncidentOfferAlert(ngo.email, complaint).catch((err) => {
+          console.error(`❌ Background email during redispatch to ${ngo.email} failed:`, err.message);
+        });
+      }
+    }
+
     if (!this.isNgoOfferNotificationEnabled()) {
       return;
     }
@@ -365,17 +375,9 @@ class NgoRedispatchService {
     }
 
     try {
-      const hasPendingOffer = await NgoCaseOffer.exists({
-        complaintId: lockedComplaint._id,
-        status: "PENDING",
-      });
-
-      if (hasPendingOffer) {
-        return {
-          dispatched: false,
-          reason: "PENDING_NGO_OFFER_ALREADY_EXISTS",
-        };
-      }
+      // Note: We do NOT early-exit if pending offers exist — the $nin previouslyOfferedNgoIds
+      // already deduplicates, so new NGOs that were not previously offered will still be found.
+      // Removing this guard ensures subsequent dispatch waves reach all remaining NGOs.
 
       const previousOffers = await NgoCaseOffer.find({
         complaintId: lockedComplaint._id,
@@ -387,10 +389,15 @@ class NgoRedispatchService {
         (offer) => offer.ngoId,
       );
 
-      const rankedNgos = await this.findRankedEligibleNgos(
-        lockedComplaint,
-        previouslyOfferedNgoIds,
-      );
+      const verifiedNgos = await NGO.find({
+        verificationStatus: "VERIFIED",
+        _id: { $nin: previouslyOfferedNgoIds }
+      }).lean();
+
+      const rankedNgos = verifiedNgos.map(ngo => ({
+        ngo,
+        matchScore: 100
+      }));
 
       if (rankedNgos.length === 0) {
         console.log(
@@ -412,9 +419,7 @@ class NgoRedispatchService {
 
       const dispatchWave = maxPreviousWave + 1;
 
-      const batchSize = this.getOfferBatchSize(lockedComplaint.severity);
-
-      const nextWave = rankedNgos.slice(0, batchSize);
+      const nextWave = rankedNgos;
 
       const { offerExpiryMinutes } = getNgoOfferExpiryConfig();
 
@@ -440,8 +445,9 @@ class NgoRedispatchService {
                 expiresAt,
                 expiredAt: null,
                 dispatchWave,
-                createdAt: now,
-                updatedAt: now,
+                // NOTE: Do NOT set createdAt/updatedAt here — NgoCaseOffer has
+                // timestamps: true so Mongoose auto-injects them. Manually setting
+                // updatedAt in $setOnInsert conflicts with Mongoose's $set injection.
               },
             },
 

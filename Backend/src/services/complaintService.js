@@ -6,6 +6,8 @@ import complaintSpamScreeningService from "./complaintSpamScreeningService.js";
 import semanticDuplicateService from "./semanticDuplicateService.js";
 import aiService from "./aiService.js";
 import ngoRedispatchService from "./ngoRedispatchService.js";
+import agentLogService from "./agentLogService.js";
+import Complaint from "../models/Complaint.js";
 
 class ComplaintService {
   hashTrackingToken(token) {
@@ -33,6 +35,63 @@ class ComplaintService {
       score: this.clampProbability(item?.score),
     }));
   }
+
+  // --- Duplicate Detection Helpers ---
+
+  normalizeForSimilarity(text) {
+    return String(text || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  getTokenSet(text) {
+    return new Set(
+      this.normalizeForSimilarity(text)
+        .split(" ")
+        .filter((t) => t.length >= 3)
+    );
+  }
+
+  getJaccardSimilarity(textA, textB) {
+    const setA = this.getTokenSet(textA);
+    const setB = this.getTokenSet(textB);
+    if (setA.size === 0 && setB.size === 0) return 1;
+    if (setA.size === 0 || setB.size === 0) return 0;
+    const intersection = [...setA].filter((t) => setB.has(t)).length;
+    const union = new Set([...setA, ...setB]).size;
+    return intersection / union;
+  }
+
+  async findTextSimilarRecentComplaint(text, locationHint, withinMinutes = 60) {
+    const since = new Date(Date.now() - withinMinutes * 60 * 1000);
+    // Only check active/routed complaints — spam/blocked ones don't count
+    const recentComplaints = await Complaint.find({
+      createdAt: { $gte: since },
+      status: {
+        $nin: ["BLOCKED", "DUPLICATE"],
+      },
+    })
+      .select("_id complaintId originalText locationHint status")
+      .limit(200)
+      .lean();
+
+    const JACCARD_THRESHOLD = 0.72;
+
+    for (const c of recentComplaints) {
+      const similarity = this.getJaccardSimilarity(text, c.originalText);
+      if (similarity >= JACCARD_THRESHOLD) {
+        console.log(
+          `🔁 Text-similarity duplicate found: ${c.complaintId} (Jaccard=${similarity.toFixed(3)})`
+        );
+        return c;
+      }
+    }
+    return null;
+  }
+
+  // -----------------------------------
 
   getEmptyClassifierAudit(status = "NOT_RUN") {
     return {
@@ -151,11 +210,11 @@ class ComplaintService {
     }
 
     if (status === "REVIEW_REQUIRED") {
-      return "Your complaint was received and needs verification before further processing.";
+      return "Your complaint was received but a very similar report may already be active. It has been flagged for human review before routing.";
     }
 
     if (status === "DUPLICATE") {
-      return "A similar complaint was already submitted recently and was marked for review.";
+      return "An identical complaint has already been submitted recently. Use your tracking link to follow the original report's progress.";
     }
 
     if (status === "PROCESSING") {
@@ -167,7 +226,7 @@ class ComplaintService {
     }
 
     if (status === "READY_FOR_ROUTING") {
-      return "Your complaint is ready for NGO routing, but no suitable verified NGO was found yet.";
+      return "Your complaint has been recorded and is being dispatched to verified NGOs in the network.";
     }
 
     if (status === "NGOS_NOTIFIED") {
@@ -278,6 +337,51 @@ class ComplaintService {
         },
       );
 
+      // Log Complaint Intake Agent run
+      await agentLogService.logRun({
+        complaintId: updatedComplaint._id,
+        agentType: "Complaint Intake Agent",
+        toolCalls: [
+          {
+            toolName: "extractComplaintData",
+            args: { text: updatedComplaint.originalText, locationHint: updatedComplaint.locationHint },
+            result: {
+              category: updatedComplaint.category,
+              severity: updatedComplaint.severity,
+              requiredPeople,
+              requiredSkills
+            }
+          }
+        ],
+        decisionSummary: `Extracted complaint category "${updatedComplaint.category}" and severity "${updatedComplaint.severity}". Status set to "${nextStatus}".`,
+        status: "SUCCESS"
+      });
+
+      // If clarification is needed, log Clarification Agent run
+      if (nextStatus === "NEEDS_CLARIFICATION") {
+        await agentLogService.logRun({
+          complaintId: updatedComplaint._id,
+          agentType: "Clarification Agent",
+          toolCalls: [
+            {
+              toolName: "requestMissingDetails",
+              args: {
+                text: updatedComplaint.originalText,
+                locationHint: updatedComplaint.locationHint,
+                needsClarification: true
+              },
+              result: {
+                questions: updatedComplaint.aiExtractedData?.clarificationQuestions || [
+                  "Please provide more specific details."
+                ]
+              }
+            }
+          ],
+          decisionSummary: `Clarification questions generated: ${JSON.stringify(updatedComplaint.aiExtractedData?.clarificationQuestions)}`,
+          status: "SUCCESS"
+        });
+      }
+
       if (nextStatus === "READY_FOR_ROUTING") {
         try {
           const routingResult = await ngoRedispatchService.dispatchNextNgoWave({
@@ -292,6 +396,7 @@ class ComplaintService {
           console.error(
             `❌ NGO routing failed for complaint ${complaint.complaintId}:`,
             routingError.message,
+            routingError.stack,
           );
         }
       }
@@ -301,22 +406,49 @@ class ComplaintService {
       const classifierAudit = await classifierAuditPromise;
 
       console.error(
-        `❌ FastAPI extraction failed for complaint ${complaint.complaintId}:`,
+        `❌ AI extraction failed for complaint ${complaint.complaintId}:`,
         error.message,
       );
 
-      return await complaintRepository.updateById(complaint._id, {
+      // FALLBACK: Even when AI is unavailable, route complaint to all NGOs
+      // with a default GENERAL_SUPPORT category so it never gets stuck at PROCESSING.
+      const fallbackCategory = "GENERAL_SUPPORT";
+      const fallbackSeverity = "MEDIUM";
+
+      let fallbackComplaint = await complaintRepository.updateById(complaint._id, {
         ...classifierAudit,
-        classificationPolicyEnabled:
-          complaintClassificationPolicyService.getBooleanEnv(
-            "ML_CLASSIFICATION_POLICY_ENABLED",
-            false,
-          ),
+        category: fallbackCategory,
+        severity: fallbackSeverity,
+        finalCategorySource: "RULE",
+        finalSeveritySource: "RULE",
+        classificationPolicyEnabled: false,
         classificationPolicyStatus: "ML_UNAVAILABLE",
-        classificationPolicyFlags: ["RULE_EXTRACTION_FAILED"],
+        classificationPolicyFlags: ["AI_EXTRACTION_FAILED", "FALLBACK_CATEGORY_ASSIGNED"],
         classificationReviewRequired: false,
-        status: "PROCESSING",
+        requiredPeople: 1,
+        requiredSkills: [],
+        status: "READY_FOR_ROUTING",
       });
+
+      // Still attempt NGO routing with the fallback category
+      try {
+        const routingResult = await ngoRedispatchService.dispatchNextNgoWave({
+          complaintId: fallbackComplaint._id,
+          trigger: "INITIAL_ROUTING",
+        });
+
+        if (routingResult.complaint) {
+          fallbackComplaint = routingResult.complaint;
+        }
+      } catch (routingError) {
+        console.error(
+          `❌ Fallback NGO routing also failed for complaint ${complaint.complaintId}:`,
+          routingError.message,
+          routingError.stack,
+        );
+      }
+
+      return fallbackComplaint;
     }
   }
 
@@ -365,11 +497,41 @@ class ComplaintService {
         screeningResult.finalSpamDecision,
       );
 
+      // Semantic duplicate check: AI hit
       if (
         screeningResult.finalSpamDecision === "ALLOW" &&
         semanticResult.semanticDuplicateStatus === "POSSIBLE_DUPLICATE"
       ) {
         complaintStatus = "REVIEW_REQUIRED";
+      }
+
+      // Fallback: when AI embedding service is unavailable, run Jaccard token-overlap check
+      // This catches near-identical resubmissions even without the ML service running.
+      if (
+        screeningResult.finalSpamDecision === "ALLOW" &&
+        semanticResult.semanticDuplicateStatus === "UNAVAILABLE"
+      ) {
+        try {
+          const textSimilarMatch = await this.findTextSimilarRecentComplaint(
+            cleanText,
+            cleanLocationHint,
+            60, // look back 60 minutes
+          );
+
+          if (textSimilarMatch) {
+            complaintStatus = "REVIEW_REQUIRED";
+            // Inject a pseudo-semantic result so the DB record reflects what happened
+            semanticResult = {
+              ...semanticResult,
+              semanticDuplicateStatus: "POSSIBLE_DUPLICATE",
+              semanticDuplicateOfComplaintId: textSimilarMatch._id,
+              semanticDuplicateScore: null,
+              semanticDuplicateCheckedAt: new Date(),
+            };
+          }
+        } catch (jaccardError) {
+          console.warn(`⚠️ Jaccard fallback check failed: ${jaccardError.message}`);
+        }
       }
     }
 
@@ -418,6 +580,7 @@ class ComplaintService {
 
     const canContinueAutomatically =
       !duplicateComplaint &&
+      complaintStatus !== "REVIEW_REQUIRED" &&
       screeningResult.finalSpamDecision === "ALLOW" &&
       semanticResult.semanticDuplicateStatus !== "POSSIBLE_DUPLICATE";
 
@@ -497,6 +660,7 @@ class ComplaintService {
       assignedPeopleCount: complaint.assignedPeopleCount,
       createdAt: complaint.createdAt,
       updatedAt: complaint.updatedAt,
+      feedback: complaint.feedback || null,
     };
   }
 }

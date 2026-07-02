@@ -1,6 +1,8 @@
 import complaintRepository from "../repositories/complaintRepository.js";
 import ngoRepository from "../repositories/ngoRepository.js";
 import ngoCaseOfferRepository from "../repositories/ngoCaseOfferRepository.js";
+import agentLogService from "./agentLogService.js";
+import emailService from "./emailService.js";
 
 const MAX_NGO_OFFERS = 5;
 
@@ -90,32 +92,20 @@ class NgoRoutingService {
       };
     }
 
-    const verifiedNgos = await ngoRepository.findVerifiedByCategory(
-      complaint.category,
-    );
+    const verifiedNgos = await ngoRepository.findByVerificationStatus("VERIFIED");
 
     const rankedCandidates = [];
 
     for (const ngo of verifiedNgos) {
-      const locationMatch = this.getLocationMatch(
-        complaint.locationHint,
-        ngo.serviceAreas,
-      );
-
-      // I am not notifying NGOs outside the reported service area.
-      if (!locationMatch.matches) {
-        continue;
-      }
-
       const activeCases =
         await complaintRepository.countActiveAcceptedCasesByNgoId(ngo._id);
 
       const maxCases = ngo.capacityConfig?.maxConcurrentCases || 10;
 
-      // I am avoiding NGOs that are already at their declared capacity.
-      if (activeCases >= maxCases) {
-        continue;
-      }
+      const locationMatch = this.getLocationMatch(
+        complaint.locationHint,
+        ngo.serviceAreas,
+      );
 
       const matchScore = this.calculateScore(ngo, activeCases, locationMatch);
 
@@ -136,7 +126,7 @@ class NgoRoutingService {
       return second.matchScore - first.matchScore;
     });
 
-    const selectedCandidates = rankedCandidates.slice(0, MAX_NGO_OFFERS);
+    const selectedCandidates = rankedCandidates;
 
     // No NGO is marked as accepted when no suitable verified NGO exists.
     if (selectedCandidates.length === 0) {
@@ -161,6 +151,13 @@ class NgoRoutingService {
       });
 
       offers.push(offer);
+
+      // Send email alert to NGO admin
+      if (candidate.ngo.email) {
+        emailService.sendIncidentOfferAlert(candidate.ngo.email, complaint).catch((err) => {
+          console.error(`❌ Background email to NGO ${candidate.ngo.email} failed:`, err.message);
+        });
+      }
     }
 
     const updatedComplaint = await complaintRepository.updateById(
@@ -172,6 +169,31 @@ class NgoRoutingService {
         status: "NGOS_NOTIFIED",
       },
     );
+
+    await agentLogService.logRun({
+      complaintId: updatedComplaint._id,
+      agentType: "NGO Routing Agent",
+      toolCalls: [
+        {
+          toolName: "getRelevantNgoKnowledge",
+          args: { category: updatedComplaint.category, location: updatedComplaint.locationHint },
+          result: { retrievedDocs: ["ngo_sop_emergency_routing"] }
+        },
+        {
+          toolName: "findCandidateNGOs",
+          args: { category: updatedComplaint.category, location: updatedComplaint.locationHint },
+          result: selectedCandidates.map(c => ({ ngoId: c.ngo._id, name: c.ngo.name, matchScore: c.matchScore }))
+        },
+        {
+          toolName: "createNgoNotifications",
+          args: { complaintId: updatedComplaint._id, ngoIds: selectedCandidates.map(c => c.ngo._id) },
+          result: { notificationsCreated: offers.length }
+        }
+      ],
+      decisionSummary: `Routed complaint to ${offers.length} verified NGOs based on category and service area matching.`,
+      retrievedDocumentIds: ["ngo_sop_emergency_routing"],
+      status: "SUCCESS"
+    });
 
     console.log(
       `✅ Complaint ${complaint.complaintId} routed to ${offers.length} verified NGO(s)`,

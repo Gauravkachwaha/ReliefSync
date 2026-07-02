@@ -7,8 +7,6 @@ const volunteerSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
-      unique: true,
-      sparse: true,
     },
 
     name: {
@@ -108,6 +106,14 @@ volunteerSchema.index({
   availability: 1,
   verificationStatus: 1,
 });
+
+volunteerSchema.index(
+  { userId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { userId: { $ne: null } },
+  }
+);
 
 const Volunteer = mongoose.model("Volunteer", volunteerSchema);
 

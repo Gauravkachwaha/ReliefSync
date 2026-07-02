@@ -66,7 +66,8 @@ export default function NgoDashboard() {
   // Situation Reports
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(false);
-  const [repTitle, setRepTitle] = useState("");
+  const [pdfTitle, setPdfTitle] = useState("");
+  const [textTitle, setTextTitle] = useState("");
   const [repText, setRepText] = useState("");
   const [repFile, setRepFile] = useState(null);
   const [submittingReport, setSubmittingReport] = useState(false);
@@ -167,6 +168,11 @@ export default function NgoDashboard() {
       setLoadingReports(false);
     }
   };
+
+  // Load case offers on mount to populate the notification badge
+  useEffect(() => {
+    loadCaseOffers();
+  }, []);
 
   // Run on tab switch
   useEffect(() => {
@@ -308,17 +314,17 @@ export default function NgoDashboard() {
   // Submit Text Report
   const handleTextReportSubmit = async (e) => {
     e.preventDefault();
-    if (!repTitle || !repText) {
+    if (!textTitle || !repText) {
       setReportError("Title and description content are required");
       return;
     }
     setSubmittingReport(true);
     setReportError("");
     try {
-      const res = await api.reports.submitText(repTitle, repText);
+      const res = await api.reports.submitText(textTitle, repText);
       if (res.success) {
         alert("Situation Report created successfully. Incident summary processed by AI.");
-        setRepTitle("");
+        setTextTitle("");
         setRepText("");
         loadReports();
       }
@@ -332,17 +338,17 @@ export default function NgoDashboard() {
   // Submit PDF Report
   const handlePdfReportSubmit = async (e) => {
     e.preventDefault();
-    if (!repTitle || !repFile) {
+    if (!pdfTitle || !repFile) {
       setReportError("Title and PDF file are required");
       return;
     }
     setSubmittingReport(true);
     setReportError("");
     try {
-      const res = await api.reports.submitPdf(repTitle, repFile);
+      const res = await api.reports.submitPdf(pdfTitle, repFile);
       if (res.success) {
         alert("PDF Situation report parsed. AI summaries extracted successfully.");
-        setRepTitle("");
+        setPdfTitle("");
         setRepFile(null);
         // Reset file input element
         document.getElementById("pdf-file-input").value = "";
@@ -926,7 +932,7 @@ export default function NgoDashboard() {
                     
                     <div className="form-group">
                       <label>Report Title</label>
-                      <input type="text" required value={repTitle} onChange={e => setRepTitle(e.target.value)} placeholder="e.g. Cyclone Triage Summary Area 4" />
+                      <input type="text" required value={pdfTitle} onChange={e => setPdfTitle(e.target.value)} placeholder="e.g. Cyclone Triage Summary Area 4" />
                     </div>
 
                     <div className="form-group">
@@ -957,7 +963,7 @@ export default function NgoDashboard() {
 
                     <div className="form-group">
                       <label>Report Title</label>
-                      <input type="text" required value={repTitle} onChange={e => setRepTitle(e.target.value)} placeholder="e.g. Field Update Area 1" />
+                      <input type="text" required value={textTitle} onChange={e => setTextTitle(e.target.value)} placeholder="e.g. Field Update Area 1" />
                     </div>
 
                     <div className="form-group">

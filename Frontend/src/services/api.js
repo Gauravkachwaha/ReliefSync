@@ -75,6 +75,21 @@ export const api = {
         headers: { "Content-Type": "application/json" },
       });
       return handleResponse(res);
+    },
+    getNgos: async () => {
+      const res = await fetch(`${API_URL}/public/ngos`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      return handleResponse(res);
+    },
+    submitFeedback: async (complaintId, token, rating, comments) => {
+      const res = await fetch(`${API_URL}/public/complaints/${complaintId}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, rating, comments }),
+      });
+      return handleResponse(res);
     }
   },
 
@@ -337,6 +352,69 @@ export const api = {
     },
     getVolunteerStats: async () => {
       const res = await fetch(`${API_URL}/dashboard/volunteer-stats`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+      return handleResponse(res);
+    }
+  },
+  
+  // Super Admin Management
+  superAdmin: {
+    getNgoVerificationQueue: async (status = "PENDING") => {
+      const res = await fetch(`${API_URL}/super-admin/ngos?status=${status}`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+      return handleResponse(res);
+    },
+    updateNgoVerification: async (ngoId, verificationStatus) => {
+      const res = await fetch(`${API_URL}/super-admin/ngos/${ngoId}/verification`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ verificationStatus }),
+      });
+      return handleResponse(res);
+    },
+    getSpamReviewQueue: async () => {
+      const res = await fetch(`${API_URL}/super-admin/spam-queue`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+      return handleResponse(res);
+    },
+    resolveSpamReview: async (complaintId, decision) => {
+      const res = await fetch(`${API_URL}/super-admin/spam-queue/${complaintId}/decision`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ decision }),
+      });
+      return handleResponse(res);
+    },
+    getEscalations: async (status = "OPEN") => {
+      const res = await fetch(`${API_URL}/super-admin/escalations?status=${status}`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+      return handleResponse(res);
+    },
+    resolveEscalation: async (escalationId, resolvedNote) => {
+      const res = await fetch(`${API_URL}/super-admin/escalations/${escalationId}/resolve`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify({ resolvedNote }),
+      });
+      return handleResponse(res);
+    },
+    getAuditLogs: async () => {
+      const res = await fetch(`${API_URL}/super-admin/audit-logs`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+      return handleResponse(res);
+    },
+    getAnalytics: async () => {
+      const res = await fetch(`${API_URL}/super-admin/analytics`, {
         method: "GET",
         headers: getHeaders(),
       });

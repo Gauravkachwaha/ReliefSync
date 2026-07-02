@@ -32,9 +32,9 @@ export function Card({ children, title, subtitle, className = "", hoverable = fa
 }
 
 /* ─── Badge ─── */
-export function Badge({ status }) {
+export function Badge({ status, label }) {
   const raw = String(status || "").toUpperCase();
-  const label = raw.replace(/_/g, " ");
+  const displayLabel = label || raw.replace(/_/g, " ");
 
   let type = "medium";
   if (["CRITICAL","BLOCKED","REJECTED","EXPIRED","CANCELLED"].includes(raw)) type = "critical";
@@ -42,7 +42,7 @@ export function Badge({ status }) {
   else if (["SUCCESS","ACCEPTED","NGO_ACCEPTED","FULLY_ASSIGNED","RESOLVED","AVAILABLE","COMPLETED"].includes(raw)) type = "success";
   else if (["LOW","OFF_DUTY"].includes(raw)) type = "low";
 
-  return <span className={`badge badge-${type}`}>{label}</span>;
+  return <span className={`badge badge-${type}`}>{displayLabel}</span>;
 }
 
 /* ─── Modal ─── */
@@ -114,6 +114,14 @@ export function Navbar({ user, onLogout, currentView, onViewChange }) {
                 className={`btn btn-sm ${currentView === "volunteer" ? "btn-primary" : "btn-secondary"}`}
               >
                 My Portal
+              </button>
+            )}
+            {user.role === "super_admin" && (
+              <button
+                onClick={() => onViewChange("super-admin")}
+                className={`btn btn-sm ${currentView === "super-admin" ? "btn-primary" : "btn-secondary"}`}
+              >
+                Admin Console
               </button>
             )}
 

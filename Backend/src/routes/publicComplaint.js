@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import {
   submitGuestComplaint,
   trackGuestComplaint,
+  submitComplaintFeedback,
 } from "../controllers/publicComplaintController.js";
 
 const router = express.Router();
@@ -35,5 +36,7 @@ const complaintTrackingLimiter = rateLimit({
 router.post("/", complaintSubmissionLimiter, submitGuestComplaint);
 
 router.get("/:complaintId", complaintTrackingLimiter, trackGuestComplaint);
+
+router.post("/:complaintId/feedback", complaintTrackingLimiter, submitComplaintFeedback);
 
 export default router;

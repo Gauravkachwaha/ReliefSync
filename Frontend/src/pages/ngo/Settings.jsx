@@ -58,7 +58,7 @@ export default function Settings() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up max-w-2xl">
       <div>
-        <h1 className="text-2xl font-extrabold">NGO Settings</h1>
+        <h1 className="text-2xl font-semibold">NGO Settings</h1>
         <p className="text-text-secondary text-sm mt-1">
           Control what kinds of cases get routed to {ngo?.name || "your organization"} and how many you can handle.
         </p>
@@ -75,11 +75,11 @@ export default function Settings() {
                   onClick={() => toggleCat(c.v)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border justify-start transition-colors ${
                     categories.includes(c.v)
-                      ? "bg-gradient-to-br from-primary to-orange-500 border-transparent text-white"
-                      : "bg-white/5 border-border text-text-secondary hover:border-border-hover"
+                      ? "bg-primary border-transparent text-white"
+                      : "bg-black/5 border-border text-text-secondary hover:border-border-hover"
                   }`}
                 >
-                  <span className="h-4 w-4 rounded border border-white/40 flex items-center justify-center shrink-0">
+                  <span className="h-4 w-4 rounded border border-current/40 flex items-center justify-center shrink-0">
                     {categories.includes(c.v) && <Check size={11} />}
                   </span>
                   {c.l}

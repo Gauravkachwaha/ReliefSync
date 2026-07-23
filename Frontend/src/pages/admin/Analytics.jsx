@@ -14,7 +14,7 @@ export default function Analytics() {
   return (
     <div className="flex flex-col gap-8 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Analytics</h1>
+        <h1 className="text-2xl font-semibold">Analytics</h1>
         <p className="text-text-secondary text-sm mt-1">Platform-wide compliance and emergency routing overview.</p>
       </div>
 

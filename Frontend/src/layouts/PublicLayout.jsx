@@ -6,8 +6,8 @@ import { useAuth, ROLE_HOME } from "../context/AuthContext";
 
 const navLinkClass = ({ isActive }) =>
   [
-    "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors",
-    isActive ? "bg-white/10 text-text" : "text-text-secondary hover:text-text hover:bg-white/5",
+    "flex items-center gap-1.5 px-3.5 py-2 rounded-pill text-sm font-semibold transition-colors",
+    isActive ? "bg-black/5 text-text" : "text-text-secondary hover:text-text hover:bg-black/5",
   ].join(" ");
 
 export default function PublicLayout() {
@@ -29,7 +29,7 @@ export default function PublicLayout() {
           </NavLink>
           <NavLink
             to={user ? ROLE_HOME[user.role] || "/" : "/login"}
-            className="ml-2 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-gradient-to-br from-primary to-orange-500 text-white shadow"
+            className="ml-2 flex items-center gap-1.5 px-4 py-2 rounded-pill text-sm font-bold bg-text text-canvas shadow-sm hover:bg-black transition-colors"
           >
             <LogIn size={14} /> {user ? "Dashboard" : "Login"}
           </NavLink>

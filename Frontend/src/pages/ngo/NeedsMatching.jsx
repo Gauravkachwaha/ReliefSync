@@ -33,7 +33,7 @@ export default function NeedsMatching() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Needs & Matching</h1>
+        <h1 className="text-2xl font-semibold">Needs & Matching</h1>
         <p className="text-text-secondary text-sm mt-1">Select an accepted complaint to match volunteers.</p>
       </div>
 
@@ -60,7 +60,7 @@ export default function NeedsMatching() {
                 <p className="text-xs text-text-secondary line-clamp-2 mb-2">{need.extractedData?.summary}</p>
                 <div className="flex flex-wrap gap-1.5 text-[10px] text-text-dim">
                   {need.extractedData?.requiredSkills?.map((s, i) => (
-                    <span key={i} className="bg-white/5 px-1.5 py-0.5 rounded border border-border">{s}</span>
+                    <span key={i} className="bg-black/5 px-1.5 py-0.5 rounded border border-border">{s}</span>
                   ))}
                 </div>
               </Card>
@@ -101,7 +101,7 @@ export default function NeedsMatching() {
                         {v.skills?.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mb-2">
                             {v.skills.map((s, i) => (
-                              <span key={i} className="bg-white/5 px-1.5 py-0.5 rounded border border-border text-[10px] text-text-dim">{s}</span>
+                              <span key={i} className="bg-black/5 px-1.5 py-0.5 rounded border border-border text-[10px] text-text-dim">{s}</span>
                             ))}
                           </div>
                         )}

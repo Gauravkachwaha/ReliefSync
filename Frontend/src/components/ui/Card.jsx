@@ -40,7 +40,7 @@ export function StatCard({ label, value, icon: Icon, tone = "primary" }) {
       <div className="text-[0.7rem] font-bold uppercase tracking-wider text-text-dim mb-1.5">
         {label}
       </div>
-      <div className="font-display text-4xl font-extrabold leading-none">{value}</div>
+      <div className="font-display text-4xl font-semibold leading-none">{value}</div>
     </div>
   );
 }

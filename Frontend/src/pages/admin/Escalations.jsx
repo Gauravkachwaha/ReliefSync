@@ -37,7 +37,7 @@ export default function Escalations() {
     <div className="flex flex-col gap-6 animate-fade-up">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold">Active Escalations</h1>
+          <h1 className="text-2xl font-semibold">Active Escalations</h1>
           <p className="text-text-secondary text-sm mt-1">Cases that could not be resolved by automated routing.</p>
         </div>
         <Tabs value={status} onChange={setStatus} options={TABS} />

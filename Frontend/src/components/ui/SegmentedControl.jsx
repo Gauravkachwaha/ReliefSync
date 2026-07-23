@@ -12,10 +12,10 @@ export function SegmentedControl({ value, onChange, options, className = "" }) {
             type="button"
             onClick={() => onChange(opt.value)}
             className={[
-              "flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-all",
+              "flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-pill text-xs font-semibold border transition-all",
               active
-                ? "bg-gradient-to-br from-primary to-orange-500 border-transparent text-white shadow"
-                : "bg-white/5 border-border text-text-secondary hover:border-border-hover hover:text-text",
+                ? "bg-text border-transparent text-canvas shadow-sm"
+                : "bg-surface border-border text-text-secondary hover:border-border-hover hover:text-text",
             ].join(" ")}
           >
             {Icon && <Icon size={13} />}

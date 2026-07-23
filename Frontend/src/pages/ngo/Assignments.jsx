@@ -26,7 +26,7 @@ export default function Assignments() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Task Allocations</h1>
+        <h1 className="text-2xl font-semibold">Task Allocations</h1>
         <p className="text-text-secondary text-sm mt-1">Assigned volunteers and field progress.</p>
       </div>
 
@@ -53,7 +53,7 @@ export default function Assignments() {
                 <p className="text-xs text-text-secondary italic mb-2">"{a.needId.extractedData.summary}"</p>
               )}
               {a.notes && (
-                <p className="text-xs text-text-dim bg-white/5 rounded-lg px-3 py-2 mb-2">{a.notes}</p>
+                <p className="text-xs text-text-dim bg-black/5 rounded-lg px-3 py-2 mb-2">{a.notes}</p>
               )}
               {a.status !== "completed" && (
                 <div className="flex justify-end pt-2 border-t border-border">

@@ -2,21 +2,21 @@ import React from "react";
 
 const VARIANTS = {
   primary:
-    "bg-gradient-to-br from-primary to-orange-500 text-white shadow-[0_2px_12px_hsl(263_85%_64%/30%)] hover:shadow-[0_4px_20px_hsl(263_85%_64%/40%)] hover:-translate-y-px",
+    "bg-text text-canvas shadow-sm hover:bg-black hover:-translate-y-px hover:shadow-md",
   accent:
-    "bg-gradient-to-br from-accent to-cyan-500 text-canvas font-bold hover:-translate-y-px",
+    "bg-primary text-white shadow-sm hover:bg-primary-600 hover:-translate-y-px hover:shadow-md",
   secondary:
-    "bg-white/5 border border-border text-text hover:bg-white/10 hover:border-border-hover",
-  ghost: "bg-transparent text-text-secondary hover:bg-white/5 hover:text-text",
+    "bg-surface border border-border text-text hover:border-border-hover hover:bg-surface-input",
+  ghost: "bg-transparent text-text-secondary hover:bg-black/5 hover:text-text",
   danger:
-    "bg-danger-bg border border-danger/25 text-danger hover:bg-danger/20",
+    "bg-danger-bg border border-danger/25 text-danger hover:bg-danger/15",
   success:
-    "bg-success-bg border border-success/25 text-success hover:bg-success/20",
+    "bg-success-bg border border-success/25 text-success hover:bg-success/15",
 };
 
 const SIZES = {
-  sm: "text-xs px-3 py-1.5 gap-1.5 rounded-lg",
-  md: "text-sm px-5 py-2.5 gap-2 rounded-xl",
+  sm: "text-xs px-3.5 py-1.5 gap-1.5 rounded-pill",
+  md: "text-sm px-5 py-2.5 gap-2 rounded-pill",
   icon: "p-2 rounded-lg",
 };
 
@@ -44,7 +44,7 @@ export default function Button({
       {...props}
     >
       {loading ? (
-        <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+        <span className="h-4 w-4 rounded-full border-2 border-current/30 border-t-current animate-spin" />
       ) : (
         children
       )}

@@ -35,7 +35,7 @@ export default function NgoDirectory() {
     <div className="flex-1 px-6 py-12 max-w-6xl mx-auto w-full grid lg:grid-cols-12 gap-8">
       <div className="lg:col-span-5 flex flex-col gap-5">
         <div>
-          <h2 className="text-2xl font-extrabold flex items-center gap-2">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
             <Award size={22} className="text-accent" /> NGO Impact Board
           </h2>
           <p className="text-text-dim text-xs mt-1">
@@ -47,9 +47,9 @@ export default function NgoDirectory() {
         ) : (
           ranked.map((ngo, idx) => (
             <div key={ngo._id} className="glass p-5 relative border-l-4 border-l-accent/40">
-              <div className="absolute right-4 top-4 text-[10px] text-text-dim font-extrabold">RANK #{idx + 1}</div>
+              <div className="absolute right-4 top-4 text-[10px] text-text-dim font-semibold">RANK #{idx + 1}</div>
               <div className="pr-16">
-                <h4 className="font-extrabold flex items-center gap-1.5">
+                <h4 className="font-semibold flex items-center gap-1.5">
                   {ngo.name} <CheckCircle size={14} className="text-accent" />
                 </h4>
                 <p className="text-[10px] text-text-dim mt-0.5">
@@ -57,7 +57,7 @@ export default function NgoDirectory() {
                 </p>
               </div>
               <div className="mt-3">
-                <span className="font-display text-2xl font-black text-accent">{ngo.impactScore || 0}</span>
+                <span className="font-display text-2xl font-bold text-accent">{ngo.impactScore || 0}</span>
                 <span className="text-[9px] text-text-dim uppercase tracking-widest font-bold ml-2">Impact Index</span>
               </div>
               <div className="grid grid-cols-2 gap-4 text-[11px] text-text-secondary border-t border-border pt-3 mt-3">
@@ -71,7 +71,7 @@ export default function NgoDirectory() {
 
       <div className="lg:col-span-7 flex flex-col gap-5">
         <div>
-          <h2 className="text-2xl font-extrabold flex items-center gap-2">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
             <Users size={22} className="text-primary" /> Verified NGO Directory
           </h2>
           <p className="text-text-dim text-xs mt-1">Explore capabilities and areas served by response organizations.</p>
@@ -90,7 +90,7 @@ export default function NgoDirectory() {
           <div className="grid sm:grid-cols-2 gap-4">
             {filtered.map((ngo) => (
               <div key={ngo._id} className="glass p-5 border-l-4 border-l-primary/40">
-                <h4 className="font-extrabold">{ngo.name}</h4>
+                <h4 className="font-semibold">{ngo.name}</h4>
                 <span className="text-[10px] text-text-dim block mt-0.5">
                   {ngo.email} · {ngo.phone || "No phone"}
                 </span>

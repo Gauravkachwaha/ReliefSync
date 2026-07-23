@@ -35,7 +35,7 @@ export default function NgoVerification() {
     <div className="flex flex-col gap-6 animate-fade-up">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold">NGO Verification</h1>
+          <h1 className="text-2xl font-semibold">NGO Verification</h1>
           <p className="text-text-secondary text-sm mt-1">Approve or reject organizations requesting network access.</p>
         </div>
         <Tabs value={status} onChange={setStatus} options={TABS} />

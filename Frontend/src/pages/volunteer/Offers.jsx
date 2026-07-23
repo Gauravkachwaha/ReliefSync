@@ -27,7 +27,7 @@ export default function VolunteerOffers() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Case Offers</h1>
+        <h1 className="text-2xl font-semibold">Case Offers</h1>
         <p className="text-text-secondary text-sm mt-1">Offers requiring your acceptance.</p>
       </div>
 

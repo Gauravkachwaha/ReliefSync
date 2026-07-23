@@ -58,7 +58,7 @@ export default function VolunteersRoster() {
     <div className="flex flex-col gap-6 animate-fade-up">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold">Volunteers Roster</h1>
+          <h1 className="text-2xl font-semibold">Volunteers Roster</h1>
           <p className="text-text-secondary text-sm mt-1">Search, review, and register field responders.</p>
         </div>
         <Button onClick={() => setModalOpen(true)}>
@@ -94,7 +94,7 @@ export default function VolunteersRoster() {
               <p className="text-[11px] text-text-dim mb-2">{v.location}</p>
               <div className="flex flex-wrap gap-1.5">
                 {v.skills?.map((s, i) => (
-                  <span key={i} className="bg-white/5 px-1.5 py-0.5 rounded border border-border text-[10px] text-text-dim">{s}</span>
+                  <span key={i} className="bg-black/5 px-1.5 py-0.5 rounded border border-border text-[10px] text-text-dim">{s}</span>
                 ))}
               </div>
             </Card>

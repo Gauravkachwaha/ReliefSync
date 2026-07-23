@@ -64,7 +64,7 @@ export default function TrackComplaint() {
   return (
     <div className="flex-1 px-6 py-14 max-w-xl mx-auto w-full flex flex-col gap-6 animate-fade-up">
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold mb-2">
+        <h1 className="text-3xl font-semibold mb-2">
           Track Your <span className="gradient-text">Report</span>
         </h1>
         <p className="text-text-secondary text-sm">Enter the credentials you received on submission.</p>
@@ -113,7 +113,7 @@ export default function TrackComplaint() {
                 {STAGES.map((s, i) => (
                   <div
                     key={s}
-                    className={`h-1.5 flex-1 rounded-full ${i <= stageIndex ? "bg-primary" : "bg-white/10"}`}
+                    className={`h-1.5 flex-1 rounded-full ${i <= stageIndex ? "bg-primary" : "bg-black/10"}`}
                     title={s}
                   />
                 ))}

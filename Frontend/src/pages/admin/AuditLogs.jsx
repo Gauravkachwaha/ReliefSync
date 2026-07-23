@@ -16,7 +16,7 @@ export default function AuditLogs() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Agentic Audit Logs</h1>
+        <h1 className="text-2xl font-semibold">Agentic Audit Logs</h1>
         <p className="text-text-secondary text-sm mt-1">AI agent activity and notification delivery trail.</p>
       </div>
 

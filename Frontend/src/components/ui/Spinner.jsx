@@ -13,7 +13,7 @@ export function Spinner({ size = "md", className = "" }) {
 }
 
 export function Skeleton({ className = "" }) {
-  return <div className={`animate-pulse rounded-lg bg-white/5 ${className}`} />;
+  return <div className={`animate-pulse rounded-lg bg-black/5 ${className}`} />;
 }
 
 export function CardSkeleton({ lines = 3 }) {

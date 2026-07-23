@@ -1,84 +1,92 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+/*
+  Warm, editorial light theme — ivory canvas, near-black ink, a single
+  terracotta accent, serif display headings. One accent color, used sparingly.
+*/
 @theme {
-  /* Brand */
-  --color-primary-50: hsl(263, 90%, 96%);
-  --color-primary-200: hsl(263, 88%, 86%);
-  --color-primary-400: hsl(263, 88%, 72%);
-  --color-primary: hsl(263, 85%, 64%);
-  --color-primary-600: hsl(263, 82%, 56%);
-  --color-primary-700: hsl(263, 78%, 46%);
+  /* Terracotta accent */
+  --color-primary: hsl(16, 58%, 60%);
+  --color-primary-600: hsl(16, 55%, 52%);
+  --color-primary-700: hsl(16, 52%, 44%);
+  --color-accent: hsl(16, 55%, 50%);
+  --color-accent-600: hsl(16, 52%, 43%);
 
-  --color-accent-200: hsl(187, 90%, 82%);
-  --color-accent: hsl(187, 92%, 46%);
-  --color-accent-600: hsl(187, 90%, 38%);
+  /* Semantic (muted, warm-leaning) */
+  --color-success: hsl(145, 38%, 34%);
+  --color-success-bg: hsl(145, 38%, 34%, 10%);
+  --color-warning: hsl(35, 85%, 38%);
+  --color-warning-bg: hsl(35, 85%, 45%, 12%);
+  --color-danger: hsl(8, 62%, 46%);
+  --color-danger-bg: hsl(8, 62%, 46%, 10%);
+  --color-info: hsl(220, 40%, 44%);
+  --color-info-bg: hsl(220, 40%, 44%, 10%);
 
-  /* Semantic */
-  --color-success: hsl(142, 70%, 45%);
-  --color-success-bg: hsl(142, 70%, 45%, 12%);
-  --color-warning: hsl(38, 92%, 48%);
-  --color-warning-bg: hsl(38, 92%, 48%, 12%);
-  --color-danger: hsl(350, 89%, 56%);
-  --color-danger-bg: hsl(350, 89%, 56%, 12%);
-  --color-info: hsl(217, 91%, 60%);
-  --color-info-bg: hsl(217, 91%, 60%, 12%);
+  /* Surfaces / ink */
+  --color-canvas: hsl(48, 33%, 97%);
+  --color-surface: hsl(0, 0%, 100%);
+  --color-surface-raised: hsl(0, 0%, 100%);
+  --color-surface-input: hsl(48, 20%, 94%);
+  --color-border: hsl(48, 12%, 86%);
+  --color-border-hover: hsl(16, 58%, 60%, 45%);
 
-  /* Surface / text (dark-first product) */
-  --color-canvas: hsl(222, 24%, 6%);
-  --color-surface: hsl(220, 20%, 9%);
-  --color-surface-raised: hsl(220, 20%, 12%);
-  --color-surface-input: hsl(220, 24%, 4%);
-  --color-border: hsl(222, 20%, 20%);
-  --color-border-hover: hsl(187, 80%, 50%, 30%);
-
-  --color-text: hsl(220, 40%, 98%);
-  --color-text-secondary: hsl(220, 14%, 72%);
-  --color-text-dim: hsl(220, 10%, 52%);
+  --color-text: hsl(60, 3%, 8%);
+  --color-text-secondary: hsl(50, 5%, 34%);
+  --color-text-dim: hsl(50, 4%, 52%);
 
   /* Type */
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
 
   /* Radius */
-  --radius-card: 1rem;
+  --radius-card: 1.25rem;
   --radius-pill: 999px;
 }
 
 @layer base {
   html {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
     @apply bg-canvas text-text font-sans antialiased;
-    background-image:
-      linear-gradient(135deg, hsl(8 46% 18% / 28%) 0%, transparent 38%),
-      linear-gradient(315deg, hsl(177 55% 15% / 24%) 0%, transparent 42%);
-    background-attachment: fixed;
+    font-size: 15px;
+    line-height: 1.6;
+    font-feature-settings: "cv11", "ss01";
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display font-bold tracking-tight;
+    @apply font-display font-medium;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::selection {
+    background: hsl(16 58% 60% / 25%);
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(217 10% 40% / 25%); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(217 10% 50% / 40%); }
+  ::-webkit-scrollbar-thumb { background: hsl(50 6% 75%); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(50 6% 65%); }
 }
 
 @layer components {
   .glass {
-    @apply bg-surface/60 backdrop-blur-xl border border-border rounded-card shadow-[0_4px_24px_rgba(0,0,0,0.25)];
+    @apply bg-surface border border-border rounded-card;
+    box-shadow: 0 1px 2px hsl(60 3% 8% / 4%), 0 8px 24px hsl(60 3% 8% / 4%);
   }
 
   .glass-hover {
-    @apply transition-all duration-200 hover:border-border-hover hover:shadow-[0_8px_32px_rgba(0,0,0,0.35)] hover:-translate-y-0.5;
+    @apply transition-all duration-200 hover:border-border-hover hover:-translate-y-0.5;
+  }
+  .glass-hover:hover {
+    box-shadow: 0 2px 4px hsl(60 3% 8% / 5%), 0 14px 32px hsl(60 3% 8% / 8%);
   }
 
   .gradient-text {
-    @apply bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent;
+    color: var(--color-accent);
   }
 }
 
@@ -86,4 +94,10 @@
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-up { animation: fade-up 0.35s ease-out both; }
+.animate-fade-up { animation: fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-drift { animation: drift 7s ease-in-out infinite; }

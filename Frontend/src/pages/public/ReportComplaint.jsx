@@ -57,7 +57,7 @@ export default function ReportComplaint() {
   return (
     <div className="flex-1 px-6 py-14 max-w-xl mx-auto w-full animate-fade-up">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-extrabold mb-2">
+        <h1 className="text-3xl font-semibold mb-2">
           Anonymous <span className="gradient-text">Ingestion Inbox</span>
         </h1>
         <p className="text-text-secondary text-sm">

@@ -54,7 +54,7 @@ export default function Reports() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Situation Reports</h1>
+        <h1 className="text-2xl font-semibold">Situation Reports</h1>
         <p className="text-text-secondary text-sm mt-1">Submit and review AI-summarized field reports.</p>
       </div>
 

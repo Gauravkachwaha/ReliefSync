@@ -11,7 +11,7 @@ export default function Overview() {
   return (
     <div className="flex flex-col gap-8 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Overview Dashboard</h1>
+        <h1 className="text-2xl font-semibold">Overview Dashboard</h1>
         <p className="text-text-secondary text-sm mt-1">Real-time stats and dispatch activity monitoring.</p>
       </div>
 

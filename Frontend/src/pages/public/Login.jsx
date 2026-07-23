@@ -35,14 +35,14 @@ export default function Login() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6 py-16">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-extrabold mb-2">
+        <h1 className="text-3xl font-semibold mb-2">
           Portal <span className="gradient-text">Authentication</span>
         </h1>
         <p className="text-text-secondary text-sm">Access your NGO, volunteer, or coordinator dashboard.</p>
       </div>
 
       <Card title="Sign In" subtitle="Enter your registered credentials." className="w-full max-w-md">
-        <div className="flex flex-wrap gap-2 justify-center mb-5 p-2 bg-black/20 rounded-xl border border-border">
+        <div className="flex flex-wrap gap-2 justify-center mb-5 p-2 bg-black/[0.03] rounded-xl border border-border">
           {DEMOS.map((d) => (
             <button
               key={d.label}
@@ -51,7 +51,7 @@ export default function Login() {
                 setEmail(d.email);
                 setPassword(d.password);
               }}
-              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white/5 border border-border text-text-secondary hover:text-text hover:border-border-hover transition-colors"
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-black/5 border border-border text-text-secondary hover:text-text hover:border-border-hover transition-colors"
             >
               {d.label}
             </button>

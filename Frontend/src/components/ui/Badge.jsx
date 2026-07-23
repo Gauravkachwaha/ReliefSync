@@ -10,7 +10,7 @@ const TONE_CLASSES = {
   high: "bg-warning-bg text-warning border-warning/25",
   medium: "bg-info-bg text-info border-info/20",
   success: "bg-success-bg text-success border-success/25",
-  low: "bg-white/5 text-text-dim border-border",
+  low: "bg-black/5 text-text-dim border-border",
 };
 
 export default function Badge({ status, label, tone: toneOverride }) {

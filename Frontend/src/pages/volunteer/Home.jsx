@@ -42,7 +42,7 @@ export default function VolunteerHome() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Welcome back, {profile.name?.split(" ")[0]}</h1>
+        <h1 className="text-2xl font-semibold">Welcome back, {profile.name?.split(" ")[0]}</h1>
         <p className="text-text-secondary text-sm mt-1">Field Relief Responder</p>
       </div>
 

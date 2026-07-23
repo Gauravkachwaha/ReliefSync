@@ -1,0 +1,100 @@
+# Render Blueprint — deploys the backend API, both background workers, and
+# the AI microservice in one go. In the Render dashboard: New -> Blueprint,
+# point it at this repo, and Render will read this file automatically.
+#
+# You still need to create MongoDB Atlas and Upstash Redis yourself (Render
+# has no free managed Mongo/Redis) and paste their connection strings into
+# the env vars marked `sync: false` below after the first deploy.
+
+services:
+  # ── Backend API ────────────────────────────────────────────────
+  - type: web
+    name: reliefsync-backend
+    runtime: node
+    rootDir: Backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false # your Vercel URL, e.g. https://reliefsync.vercel.app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AI_SERVICE_URL
+        sync: false # the AI microservice's Render URL, e.g. https://reliefsync-ai-service.onrender.com
+      - key: AI_SERVICE_API_KEY
+        sync: false # must match the same value set on reliefsync-ai-service below
+      - key: AI_SERVICE_TIMEOUT_MS
+        value: 10000
+      - key: BACKEND_REDIS_URL
+        sync: false # Upstash Redis connection string
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: SUPER_ADMIN_NAME
+        value: ReliefSync Super Admin
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+
+  # ── Offer expiry / redispatch / notifications worker ───────────
+  - type: worker
+    name: reliefsync-worker
+    runtime: node
+    rootDir: Backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run worker
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: BACKEND_REDIS_URL
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+
+  # ── Escalation sweep worker ─────────────────────────────────────
+  - type: worker
+    name: reliefsync-escalation-worker
+    runtime: node
+    rootDir: Backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run escalation-worker
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: BACKEND_REDIS_URL
+        sync: false
+
+  # ── AI microservice (FastAPI) ───────────────────────────────────
+  # Loads BERT / multilingual-e5-small / mDeBERTa via PyTorch — needs more
+  # than the free 512MB plan in practice. Use at least the Starter plan.
+  - type: web
+    name: reliefsync-ai-service
+    runtime: python
+    rootDir: AI-Service
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: AI_SERVICE_API_KEY
+        sync: false # must match the value set on reliefsync-backend above
+      - key: SPAM_MODEL_ENABLED
+        value: "true"
+      - key: EMBEDDING_MODEL_ENABLED
+        value: "true"
+      - key: COMPLAINT_CLASSIFIER_ENABLED
+        value: "true"
+      - key: REDIS_URL
+        sync: false # same Upstash Redis instance, used for model-output caching

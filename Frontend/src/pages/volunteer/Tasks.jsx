@@ -10,7 +10,7 @@ export default function VolunteerTasks() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Active Tasks &amp; Field Logs</h1>
+        <h1 className="text-2xl font-semibold">Active Tasks &amp; Field Logs</h1>
         <p className="text-text-secondary text-sm mt-1">Review assignments and submit progress updates.</p>
       </div>
 

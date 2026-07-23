@@ -30,7 +30,7 @@ export default function CaseOffers() {
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
       <div>
-        <h1 className="text-2xl font-extrabold">Incoming Incident Offers</h1>
+        <h1 className="text-2xl font-semibold">Incoming Incident Offers</h1>
         <p className="text-text-secondary text-sm mt-1">
           Complaints triaged by AI and dispatched according to your capabilities and area.
         </p>

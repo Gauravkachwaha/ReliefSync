@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="ReliefSync AI" width="100%" />
-
 # 🤝 ReliefSync AI
 
 **AI-assisted disaster & community relief coordination — from a public complaint to a dispatched volunteer, with safety-conscious automation the whole way.**
@@ -12,7 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-Python%203-005571?style=for-the-badge&logo=fastapi&logoColor=white)](#)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](#)
 
-[Overview](#-overview) • [Features](#-what-it-does) • [Architecture](#-architecture) • [Tech Stack](#%EF%B8%8F-tech-stack) • [Getting Started](#-getting-started) • [API Surface](#-api-surface) • [Roadmap](#-roadmap)
+[Overview](#-overview) • [Features](#-what-it-does) • [Architecture](#-architecture) • [Tech Stack](#%EF%B8%8F-tech-stack) • [Design](#-design-language) • [Getting Started](#-getting-started) • [Deployment](#%EF%B8%8F-deployment) • [API Surface](#-api-surface) • [Roadmap](#-roadmap)
 
 </div>
 
@@ -86,7 +84,7 @@ Every AI decision is conservative by design: models suggest, rules and humans st
   <img src="assets/screenshot-admin-spam.png" alt="Super admin spam review queue" width="49%" />
 </p>
 <p align="center">
-  <img src="assets/screenshot-volunteer-offers.png" alt="Volunteer case offers with live countdown" width="70%" />
+  <img src="assets/screenshot-volunteer-offers.png" alt="Volunteer portal home" width="70%" />
 </p>
 
 ---
@@ -133,12 +131,23 @@ graph TD
 
 | Layer | Technology | Responsibility |
 | :--- | :--- | :--- |
-| **Frontend** | React 19, React Router, TanStack Query, Tailwind CSS v4, Vite | Role-based dashboards (public, NGO, volunteer, super admin) with real URL routing and live data caching |
+| **Frontend** | React 19, React Router, TanStack Query, Tailwind CSS v4, Vite | Role-based dashboards (public, NGO, volunteer, super admin) with real URL routing, live data caching, and a warm editorial design system |
 | **Backend API** | Node.js, Express 5, JWT, Mongoose | Auth, business rules, atomic routing/matching logic, all database writes |
 | **AI Microservice** | FastAPI, PyTorch, Hugging Face Transformers | Spam classification, multilingual duplicate embeddings, zero-shot category/severity classification |
 | **Data** | MongoDB, Redis | MongoDB for durable state; Redis for model-output caching and BullMQ job queues |
 | **Background Jobs** | BullMQ | Offer expiry sweeps, redispatch waves, notification delivery, escalation sweeps |
 | **Notifications** | Nodemailer (SMTP), console/in-app outbox | Idempotent notification log with pluggable channels |
+
+---
+
+## 🎨 Design Language
+
+The UI follows a **warm, editorial design system** — calm and human rather than "emergency-app neon":
+
+- **Three-color discipline** — ivory canvas (`#FAF9F5`), near-black warm ink, and a single terracotta accent (`#D97757`). Semantic colors (success/warning/danger) appear only where meaning requires them: status badges and destructive actions.
+- **Typography** — [Fraunces](https://fonts.google.com/specimen/Fraunces) (editorial serif) for headings and display text, [Inter](https://fonts.google.com/specimen/Inter) for UI and body copy.
+- **Shape & depth** — pill-shaped buttons (ink-black primary, terracotta CTA), white cards with soft warm shadows, subtle fade-up entrance animations, and a gently pulsing node-network motif on the landing hero.
+- All tokens live in one place — `Frontend/src/styles/index.css` (`@theme` block) — so the entire palette and type scale can be retuned from a single file.
 
 ---
 
@@ -258,6 +267,39 @@ cd Frontend && npm run dev
 ```
 
 Open **http://localhost:5173** — the login page has one-click demo credential buttons for the NGO admin, volunteer, and super admin roles.
+
+---
+
+## ☁️ Deployment
+
+The stack is split into 5 deployable pieces: **Frontend** (Vercel), **Backend API + 2 background workers** (Render), **AI microservice** (Render), **MongoDB** (Atlas), **Redis** (Upstash). A `render.yaml` blueprint at the repo root deploys the four Render services in one shot.
+
+<details>
+<summary><b>Step-by-step</b></summary>
+
+**1. Data stores (free tier)**
+- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) → create a free M0 cluster → get the connection string (this is your `MONGO_URL`)
+- [Upstash](https://upstash.com/) → create a free Redis database → get the `rediss://…` connection string (this is your `BACKEND_REDIS_URL` / `REDIS_URL`)
+
+**2. Backend + workers + AI service, via Render Blueprint**
+- Push this repo to GitHub
+- In Render: **New → Blueprint**, select the repo — it reads `render.yaml` and proposes 4 services (`reliefsync-backend`, `reliefsync-worker`, `reliefsync-escalation-worker`, `reliefsync-ai-service`)
+- Note: the AI service is on the `starter` plan, not free — it loads PyTorch/Transformer models that don't fit in 512MB
+- After the first deploy, fill in the env vars marked "sync: false" in the Render dashboard for each service: your Atlas `MONGO_URL`, Upstash `BACKEND_REDIS_URL`/`REDIS_URL`, a shared `AI_SERVICE_API_KEY` (make one up, use the same value on both `reliefsync-backend` and `reliefsync-ai-service`), `AI_SERVICE_URL` (the AI service's own `https://reliefsync-ai-service.onrender.com` URL), and SMTP creds if you want real emails
+- Leave `FRONTEND_URL` blank for now — you'll fill it in after step 3
+
+**3. Frontend, on Vercel**
+- [Vercel](https://vercel.com/new) → Import the same repo
+- Set **Root Directory** to `Frontend`
+- Framework preset: Vite (auto-detected); build command `npm run build`; output `dist`
+- Add an env var `VITE_API_URL` = `https://reliefsync-backend.onrender.com/api` (your actual Render backend URL + `/api`)
+- Deploy — you'll get a `https://your-app.vercel.app` URL
+
+**4. Close the loop**
+- Back in Render, set `reliefsync-backend`'s `FRONTEND_URL` to your Vercel URL (this is what CORS checks against) and redeploy that one service
+- Seed demo data by running `node scripts/createDemoData.js` and `node scripts/createSuperAdmin.js` from a Render Shell on the backend service (or locally, pointed at the Atlas connection string)
+
+</details>
 
 ---
 

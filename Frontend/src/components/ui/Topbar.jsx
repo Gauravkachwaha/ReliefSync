@@ -5,11 +5,11 @@ import { Activity, LogOut, ShieldCheck } from "lucide-react";
 export function Brand({ to = "/" }) {
   return (
     <Link to={to} className="flex items-center gap-2.5 shrink-0">
-      <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-[0_2px_12px_hsl(263_85%_64%/30%)]">
+      <div className="h-9 w-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
         <Activity size={17} className="text-white" />
       </div>
       <div className="leading-tight">
-        <div className="font-display font-extrabold text-[1.05rem]">
+        <div className="font-display font-semibold text-[1.05rem]">
           ReliefSync <span className="text-accent">AI</span>
         </div>
         <div className="text-[0.6rem] uppercase tracking-widest text-text-dim font-semibold">

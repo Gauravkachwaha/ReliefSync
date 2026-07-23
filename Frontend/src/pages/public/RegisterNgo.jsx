@@ -65,7 +65,7 @@ export default function RegisterNgo() {
   return (
     <div className="flex-1 flex flex-col items-center px-6 py-16">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-extrabold mb-2">
+        <h1 className="text-3xl font-semibold mb-2">
           Register Your <span className="gradient-text">Organization</span>
         </h1>
         <p className="text-text-secondary text-sm">Set up your relief routing capabilities.</p>
@@ -98,11 +98,11 @@ export default function RegisterNgo() {
                   onClick={() => toggleCat(c.v)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold border justify-start transition-colors ${
                     ngoCats.includes(c.v)
-                      ? "bg-gradient-to-br from-primary to-orange-500 border-transparent text-white"
-                      : "bg-white/5 border-border text-text-secondary hover:border-border-hover"
+                      ? "bg-primary border-transparent text-white"
+                      : "bg-black/5 border-border text-text-secondary hover:border-border-hover"
                   }`}
                 >
-                  <span className="h-4 w-4 rounded border border-white/40 flex items-center justify-center shrink-0">
+                  <span className="h-4 w-4 rounded border border-current/40 flex items-center justify-center shrink-0">
                     {ngoCats.includes(c.v) && <Check size={11} />}
                   </span>
                   {c.l}

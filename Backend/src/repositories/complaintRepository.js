@@ -146,6 +146,7 @@ class ComplaintRepository {
       {
         new: true,
         timestamps: false, // We set updatedAt manually in the pipeline above
+        updatePipeline: true,
       },
     );
   }

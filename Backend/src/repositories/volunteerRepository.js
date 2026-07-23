@@ -85,6 +85,7 @@ class VolunteerRepository {
       ],
       {
         new: true,
+        updatePipeline: true,
       },
     );
   }
@@ -143,6 +144,7 @@ class VolunteerRepository {
       ],
       {
         new: true,
+        updatePipeline: true,
       },
     );
   }

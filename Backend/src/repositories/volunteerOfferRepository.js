@@ -33,6 +33,7 @@ class VolunteerOfferRepository {
         path: "complaintId",
         select: [
           "complaintId",
+          "originalText",
           "locationHint",
           "category",
           "severity",
@@ -57,6 +58,7 @@ class VolunteerOfferRepository {
         path: "complaintId",
         select: [
           "complaintId",
+          "originalText",
           "locationHint",
           "category",
           "severity",

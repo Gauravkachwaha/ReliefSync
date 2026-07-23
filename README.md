@@ -1,307 +1,295 @@
+<div align="center">
 
+<img src="assets/banner.png" alt="ReliefSync AI" width="100%" />
 
-<h1 align="center">🤝 ReliefSync AI</h1>
+# 🤝 ReliefSync AI
 
-<p align="center">
-  <strong>An Intelligent, Production-Ready Disaster Relief Ingestion, Analysis, & Volunteer Coordination Engine.</strong>
-</p>
+**AI-assisted disaster & community relief coordination — from a public complaint to a dispatched volunteer, with safety-conscious automation the whole way.**
 
-<p align="center">
-  <a href="#-key-modules">Key Modules</a> •
-  <a href="#-system-architecture--telemetry-flow">Architecture</a> •
-  <a href="#%EF%B8%8F-tech-stack-deep-dive">Tech Stack</a> •
-  <a href="#-api-endpoint-registry">API Registry</a> •
-  <a href="#%EF%B8%8F-data-schemas">Database Schemas</a> •
-  <a href="#-getting-started">Getting Started</a> •
-  <a href="#-performance-bottlenecks--solutions">Bottlenecks & Solutions</a>
-</p>
+[![Status](https://img.shields.io/badge/Status-Active-22c55e?style=for-the-badge)](#)
+[![Node](https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#)
+[![React](https://img.shields.io/badge/React-19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Python%203-005571?style=for-the-badge&logo=fastapi&logoColor=white)](#)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](#)
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge&logo=github" alt="Status" />
-  <img src="https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge" alt="Version" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License" />
-</p>
+[Overview](#-overview) • [Features](#-what-it-does) • [Architecture](#-architecture) • [Tech Stack](#%EF%B8%8F-tech-stack) • [Getting Started](#-getting-started) • [API Surface](#-api-surface) • [Roadmap](#-roadmap)
+
+</div>
 
 ---
 
 ## 📖 Overview
-**ReliefSync AI** is a multi-tier disaster relief coordination workspace. The platform ingests chaotic, unstructured community complaints (via raw text and PDF document uploads) and extracts structured situational metrics using LLMs. It then filters out spam, classifies severity, coordinates skill-based matching for local volunteers, sends out automatic SLA-based email notifications, and manages escalations for unresolved emergencies.
 
+During a crisis, reports arrive messy, duplicated, and at volume. **ReliefSync AI** is a backend-first coordination platform that takes raw public complaints — submitted with no login required — and automatically:
 
+1. Screens them for spam, with **emergency language always protected from auto-blocking**
+2. Detects duplicates by *meaning*, not just exact text, using multilingual sentence embeddings
+3. Classifies category and severity with a hybrid of deterministic rules and a zero-shot ML model
+4. Routes the case to **verified NGOs** in waves, with automatic expiry and redispatch if nobody responds
+5. Matches and offers the case to suitable **volunteers** once an NGO accepts
+6. Notifies everyone involved and **escalates to a human coordinator** when automation hits a dead end
 
-## 🚀 Key Modules
+Every AI decision is conservative by design: models suggest, rules and humans stay in control of anything high-stakes. Every step is logged, so the full lifecycle of a complaint is auditable end to end.
 
-### 1. Intelligent Data Ingestion & Extraction (LLM Pipeline)
-The system processes text and multi-page PDF documents. The ingestion engine strips raw text and passes it to the AI extraction pipeline. 
-*   **Structured Parsing:** Uses an OpenAI GPT model to convert natural language descriptions of disaster environments into uniform JSON structures.
-*   **Needs Parsing:** Extracts specific counts of affected citizens, lists matching tools/skills needed, and determines priority levels automatically.
-
-### 2. Local Spam Filter & NLP Classifiers
-A Python-based AI microservice evaluates reports to eliminate noise before database ingestion.
-*   **Spam Detection:** Runs incoming complaints through a localized Hugging Face NLP model to filter out duplicate, irrelevant, or spam submissions.
-*   **Incident Classification:** Automatically labels incidents into categories (e.g., `MEDICAL_SUPPORT`, `FOOD_RELIEF`, `SHELTER_SUPPORT`, `DISASTER_RELIEF`, `GENERAL_SUPPORT`) to router them to NGOs specialized in those functions.
-
-### 3. Geolocation & Skill-Based Matching
-An automated matchmaker pairs disaster cases with active responders.
-*   **Geospatial Proximity:** Filters volunteers based on coordinate distance.
-*   **Skill Scoring:** Matches skills needed by the incident (e.g., "First Aid", "Debris Removal", "Search & Rescue") with volunteer skill profile tags.
-*   **Concurrency Controls:** Prevents overloading volunteers by respecting the `maxActiveAssignments` parameter.
-
-### 4. SLA Monitoring & Escalation Engine
-A cron-based monitoring loop watches open incidents to guarantee response quality.
-*   **SLA Compliance:** If an incident offer remains unassigned or an NGO fails to respond within the designated SLA window, the escalation system triggers.
-*   **Notification Engine:** Automatically dispatches alerts via Nodemailer (SMTP/Gmail) to notify NGO coordinators of high-priority events, and to volunteers for new task assignments.
+<p align="center">
+  <img src="assets/screenshot-landing.png" alt="Public landing page" width="90%" />
+</p>
 
 ---
 
-## 🎨 System Architecture & Telemetry Flow
+## ✨ What It Does
 
-The diagram below details the data ingestion, classification, schema extraction, caching, and matching pathways across our three core layers.
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🛡️ Safety-First AI Triage
+- Rule-based spam screening **plus** a pretrained BERT spam classifier
+- Hybrid decision policy — a model alone can never silently block an emergency-sounding report
+- Semantic duplicate detection via `intfloat/multilingual-e5-small` embeddings, catching reworded duplicates exact-match would miss
+- Category & severity classification blending deterministic rules with a multilingual zero-shot classifier; severity can be raised automatically but never silently lowered
+
+</td>
+<td width="50%" valign="top">
+
+### 🚑 Verified Routing & Matching
+- Only **verified** NGOs are eligible for automatic routing
+- Offers dispatch in ranked waves (category fit, service area, capacity, SLA, reliability) — not a blast to everyone at once
+- Once an NGO accepts, volunteers are ranked and offered the same way
+- Atomic claim logic — two NGOs (or two volunteers) can never grab the same case
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### ⏱️ Background Reliability
+- BullMQ + Redis workers handle offer expiry, redispatch waves, notification delivery, and escalation sweeps off the request path
+- Redis also caches AI model outputs and workflow calls — and **fails open**, so a Redis outage degrades gracefully instead of breaking submissions
+- Idempotent notification outbox — the same event can never fire two duplicate alerts
+
+</td>
+<td width="50%" valign="top">
+
+### 🧭 Full Coordination Loop
+- Secure, tokenized complaint tracking for anonymous citizens (raw token never touches the database — only its hash)
+- NGO dashboard: case offers, AI volunteer matching, roster management, task allocations, situation reports, routing settings
+- Volunteer portal: availability switch, offers, live per-task progress logging
+- Super Admin console: NGO verification, spam review queue, escalations, and a full AI agent + notification audit trail
+
+</td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="assets/screenshot-ngo-dashboard.png" alt="NGO dashboard" width="49%" />
+  <img src="assets/screenshot-admin-spam.png" alt="Super admin spam review queue" width="49%" />
+</p>
+<p align="center">
+  <img src="assets/screenshot-volunteer-offers.png" alt="Volunteer case offers with live countdown" width="70%" />
+</p>
+
+---
+
+## 🏗️ Architecture
+
+ReliefSync AI is split into two backend services on purpose: **Express owns every business decision and database write**; the **FastAPI service only returns model scores** over an internal, authenticated API. This keeps AI inference swappable and testable in isolation from routing/dispatch logic.
 
 ```mermaid
 graph TD
-    classDef client fill:#00c4cc,stroke:#008c99,stroke-width:2px,color:#fff;
+    classDef client fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff;
     classDef server fill:#646cff,stroke:#4d53cc,stroke-width:2px,color:#fff;
     classDef db fill:#47a248,stroke:#3b853c,stroke-width:2px,color:#fff;
     classDef ai fill:#ee4c2c,stroke:#c43f24,stroke-width:2px,color:#fff;
-    classDef ext fill:#7c3aed,stroke:#6d28d9,stroke-width:2px,color:#fff;
+    classDef worker fill:#f59e0b,stroke:#b45309,stroke-width:2px,color:#111;
 
-    %% Ingestion Layer
-    PublicPortal["Public Portal <br> (React / Vite / CSS)"]:::client
-    NgoDashboard["NGO Dashboard <br> (React / Vite)"]:::client
-    VolunteerPortal["Volunteer Portal <br> (React / Vite)"]:::client
-    
-    %% Coordination Layer
-    ExpressAPI["Backend API Gateway <br> (Node.js & Express 5)"]:::server
-    Mongo["Core Database <br> (MongoDB / Mongoose)"]:::db
-    
-    %% Intelligent Processing Layer
-    AIService["AI Microservice <br> (FastAPI / Python 3)"]:::ai
-    Redis["High-speed Cache <br> (Redis)"]:::db
-    OpenAI["Structured LLM Extraction <br> (OpenAI GPT-4o API)"]:::ext
-    Transformers["Spam Filter & Similarity <br> (PyTorch / HF Transformers)"]:::ai
-    
-    %% Telemetry Paths
-    PublicPortal -->|Submit Reports / PDFs| ExpressAPI
-    NgoDashboard -->|Manage Missions & Match| ExpressAPI
-    VolunteerPortal -->|Update Location & Skills| ExpressAPI
-    
-    ExpressAPI -->|Persist Reports, Users & Matches| Mongo
-    ExpressAPI -->|Forward Raw Payload / Document Text| AIService
-    
-    AIService -->|Verify Token Cached| Redis
-    AIService -->|Extract Structured Need Fields| OpenAI
-    AIService -->|Evaluate Class & Calculate Embeddings| Transformers
+    Public["Public Portal<br/>(Report · Track · NGO Directory)"]:::client
+    NgoApp["NGO Admin App<br/>(Offers · Matching · Roster)"]:::client
+    VolApp["Volunteer App<br/>(Offers · Tasks)"]:::client
+    AdminApp["Super Admin Console<br/>(Verification · Escalations · Audit)"]:::client
+
+    API["Express API Gateway<br/>(auth, routing, business rules)"]:::server
+    Mongo[("MongoDB<br/>complaints, offers, assignments, logs")]:::db
+    Redis[("Redis<br/>cache + BullMQ queues")]:::db
+    AI["FastAPI AI Microservice<br/>(spam · embeddings · classification)"]:::ai
+    Worker["Background Workers<br/>expiry · redispatch · notifications · escalation"]:::worker
+
+    Public -->|Submit / Track| API
+    NgoApp -->|Accept offers, match volunteers| API
+    VolApp -->|Accept offers, log progress| API
+    AdminApp -->|Verify, resolve, audit| API
+
+    API -->|Persist state| Mongo
+    API -->|Internal service key| AI
+    API -->|Cache reads/writes| Redis
+    API -->|Enqueue jobs| Redis
+    Redis -->|Jobs claimed| Worker
+    Worker -->|Status updates| Mongo
 ```
 
 ---
 
-## 🛠️ Tech Stack Deep Dive
+## 🛠️ Tech Stack
 
-<details open>
-<summary><b>Click to expand full technology stack choices</b></summary>
-
-| Component | Technology | Rationale & Responsibility | Key Badges |
-| :--- | :--- | :--- | :--- |
-| **Frontend** | React 18, Vite | Handles live dashboards, NGO analytics, and volunteer dispatch panels. Powered by Vite for high-speed HMR. | ![React](https://img.shields.io/badge/React-20232A?style=flat-square&logo=react&logoColor=61DAFB) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=FFD62B) |
-| **Backend API** | Node.js, Express 5, JWT | Authenticates administrators and volunteers. Orchestrates Nodemailer alerts, coordinates database updates, and delegates AI tasks. | ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat-square&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white) |
-| **AI Microservice** | FastAPI, PyTorch, Hugging Face | Hosts custom spam-classifier weights and sentence embeddings models, serving API hooks to clean and convert unstructured text. | ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat-square&logo=fastapi&logoColor=white) ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white) |
-| **Databases** | MongoDB, Redis | MongoDB stores application collections (NGO, User, Volunteer, Complaint, Assignment). Redis caches AI model inference mappings. | ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white) |
-| **Extraction** | OpenAI API | Standardizes variable disaster descriptions into rigid structured payloads containing priority and volume attributes. | ![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white) |
-
-</details>
+| Layer | Technology | Responsibility |
+| :--- | :--- | :--- |
+| **Frontend** | React 19, React Router, TanStack Query, Tailwind CSS v4, Vite | Role-based dashboards (public, NGO, volunteer, super admin) with real URL routing and live data caching |
+| **Backend API** | Node.js, Express 5, JWT, Mongoose | Auth, business rules, atomic routing/matching logic, all database writes |
+| **AI Microservice** | FastAPI, PyTorch, Hugging Face Transformers | Spam classification, multilingual duplicate embeddings, zero-shot category/severity classification |
+| **Data** | MongoDB, Redis | MongoDB for durable state; Redis for model-output caching and BullMQ job queues |
+| **Background Jobs** | BullMQ | Offer expiry sweeps, redispatch waves, notification delivery, escalation sweeps |
+| **Notifications** | Nodemailer (SMTP), console/in-app outbox | Idempotent notification log with pluggable channels |
 
 ---
 
-## 🔌 API Endpoint Registry
+## 📂 Repository Structure
+
+```
+ReliefSync-AI/
+├── Frontend/                    # React 19 + Vite + Tailwind SPA
+│   └── src/
+│       ├── app/                 # App shell, router, route guards
+│       ├── layouts/             # Public layout + 3 role-based app shells
+│       ├── pages/                # public/ · ngo/ · volunteer/ · admin/
+│       ├── components/ui/       # Design-system primitives (Button, Card, Modal, Toast…)
+│       ├── hooks/api/           # TanStack Query hooks, one file per backend resource
+│       ├── context/             # Auth + Toast providers
+│       └── services/api.js      # Thin fetch client (env-configurable base URL)
+├── Backend/                     # Express REST API
+│   ├── scripts/                 # DB seeders (createDemoData, createSuperAdmin) & diagnostics
+│   └── src/
+│       ├── controllers/ routes/ # HTTP layer
+│       ├── services/            # Business logic (routing, matching, spam policy, escalation…)
+│       ├── repositories/        # Mongoose data access
+│       ├── models/              # Complaint, NGO, Volunteer, Assignment, Escalation…
+│       ├── queues/ workers/     # BullMQ background processing
+│       └── config/              # DB, Redis/BullMQ, offer expiry & redispatch tuning
+├── AI-Service/                  # FastAPI ML microservice
+│   ├── routes/                  # spam_model · embedding_model · complaint_classifier · cache
+│   └── services/                # Model loading, inference, Redis-backed result caching
+└── assets/                      # README media
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+`Node.js 20+` · `Python 3.11+` · `MongoDB` · `Redis`
+
+### 1. Environment Variables
 
 <details>
-<summary><b>Click to view route specification and JSON payloads</b></summary>
-
-### 1. Authentication Endpoints (`/api/auth`)
-*   `POST /api/auth/register-ngo` — Register an NGO user details.
-*   `POST /api/auth/login` — Authenticate user/volunteer. Returns JWT token.
-
-### 2. Ingest & AI Processing Endpoints (`/api/reports` / `/api/summaries`)
-*   `POST /api/reports/text` — Parse raw text payload into structured metrics.
-*   `POST /api/reports/pdf` — Multipart form upload (`pdf` file field) to parse multi-page documents.
-*   `POST /api/summaries/generate` — Trigger summarization of cases.
-
-#### Sample Request Body: Ingestion (POST `/api/reports/text`)
-```json
-{
-  "text": "A severe flash flood occurred near Noida Sector 62. Multiple people are trapped inside a collapsed house. We need at least three paramedics and search and rescue volunteers immediately."
-}
-```
-
-#### Sample Response Payload (POST `/api/reports/text`)
-```json
-{
-  "success": true,
-  "data": {
-    "summary": "Flash flood near Noida Sector 62 with citizens trapped inside a collapsed structure. Paramedics and search & rescue needed.",
-    "category": "DISASTER_RELIEF",
-    "severity": "CRITICAL",
-    "locationHint": "Noida Sector 62",
-    "requiredPeople": 3,
-    "requiredSkills": ["First Aid", "Search & Rescue"],
-    "needsClarification": false,
-    "clarificationQuestions": []
-  }
-}
-```
-
-### 3. Volunteer & Matchmaking (`/api/matching` / `/api/assignments`)
-*   `GET /api/matching/needs/:needId/recommendations` — Fetch recommended volunteers for a specific need sorted by distance proximity and skill score.
-*   `POST /api/assignments` — Dispatch a volunteer to a matching need.
-*   `PUT /api/assignments/:id/status` — Update task status.
-
-</details>
-
----
-
-## 🗄️ Data Schemas
-
-Our database is structured using Mongoose schemas. Below are the details:
-
-*   **NGO**:
-    *   `name`: (String, required)
-    *   `email`: (String, unique)
-    *   `supportedCategories`: Array of strings (e.g. `MEDICAL_SUPPORT`, `FOOD_RELIEF`, `SHELTER_SUPPORT`, `DISASTER_RELIEF`).
-    *   `capacityConfig`: Object tracking max active cases and auto-dispatch policies.
-    *   `verificationStatus`: ENUM (`PENDING`, `VERIFIED`, `REJECTED`).
-*   **User**:
-    *   `name`, `email`, `password` (bcrypt hash).
-    *   `role`: ENUM (`admin`, `volunteer`, `superadmin`).
-    *   `ngoId`: Reference to NGO (nullable).
-*   **Volunteer**:
-    *   `skills`: Array of tags.
-    *   `location`: Geospatial indices.
-    *   `availability`: ENUM (`available`, `assigned`, `offline`).
-    *   `maxActiveAssignments`: (Number, default 3).
-*   **Complaint**:
-    *   `originalText`: Raw report text.
-    *   `aiExtractedData`: Parsed metrics (summary, location, severity).
-    *   `isSpam`: Boolean classification flag.
-*   **Escalation**:
-    *   `complaintId`: Reference to Complaint.
-    *   `reason`, `priority`, `message`.
-
----
-
-## 📦 Getting Started
-
-### 1. Set Up Environment Variables
-
-<details>
-<summary><b>Backend Variables (`Backend/.env`)</b></summary>
+<summary><b>Backend (<code>Backend/.env</code>)</b></summary>
 
 ```env
 MONGO_URL=mongodb://localhost:27017/reliefsync
 PORT=5000
-JWT_SECRET=YOUR_JWT_SIGNING_SECRET
-OPENAI_API_KEY=sk-proj-...
-EMAIL_USER=your_gmail@gmail.com
+NODE_ENV=development
+FRONTEND_URL=http://localhost:5173
+
+JWT_SECRET=your_jwt_secret_key
+
+AI_SERVICE_URL=http://127.0.0.1:8000
+AI_SERVICE_API_KEY=your_internal_fastapi_secret
+AI_SERVICE_TIMEOUT_MS=10000
+
+EMAIL_USER=your_gmail_address@gmail.com
 EMAIL_PASS=your_gmail_app_password
+
+SUPER_ADMIN_NAME=ReliefSync Super Admin
+SUPER_ADMIN_EMAIL=superadmin@example.com
+SUPER_ADMIN_PASSWORD=change_this_before_deployment
 ```
 </details>
 
 <details>
-<summary><b>AI Microservice Variables (`AI-Service/.env`)</b></summary>
+<summary><b>AI Microservice (<code>AI-Service/.env</code>)</b></summary>
 
 ```env
-AI_SERVICE_API_KEY=YOUR_API_VERIFICATION_KEY
-REDIS_CACHE_ENABLED=true
-REDIS_URL=redis://127.0.0.1:6379/0
+AI_SERVICE_API_KEY=your_internal_fastapi_secret
+SPAM_MODEL_ENABLED=true
+EMBEDDING_MODEL_ENABLED=true
+COMPLAINT_CLASSIFIER_ENABLED=true
 ```
 </details>
 
-### 2. Seed Database & Run Services
+<details>
+<summary><b>Frontend (<code>Frontend/.env</code>, optional)</b></summary>
 
-To speed up development, we provide a pre-configured database seed script that initializes a verified NGO user account (`ngo@reliefsync.local` / `ngo12345`) and a volunteer account (`volunteer@reliefsync.local` / `volunteer12345`).
+```env
+# Only needed when the backend isn't on localhost:5000
+VITE_API_URL=https://your-backend.example.com/api
+```
+</details>
 
-You can verify your email configuration using the test script: `node scripts/testEmail.js`.
+### 2. Install & Seed
 
 ```bash
-# ---------------------------------------------
-# Terminal 1: Ingest Demo Data & Start Backend
-# ---------------------------------------------
-cd Backend
-npm install
+# Backend
+cd Backend && npm install
+node scripts/createDemoData.js     # seeds a verified NGO + demo NGO admin + volunteer
+node scripts/createSuperAdmin.js   # seeds the super admin account
 
-# Test SMTP Credentials
-node scripts/testEmail.js
-
-# Seed the MongoDB database with demo entities:
-npm run seed
-
-# Start backend server:
-npm run dev
-
-# ---------------------------------------------
-# Terminal 2: Start Frontend Dashboard
-# ---------------------------------------------
-cd Frontend
-npm install
-npm run dev
-
-# ---------------------------------------------
-# Terminal 3: Start AI Microservice
-# ---------------------------------------------
-cd AI-Service
-# Activate python virtualenv (Windows)
-.venv\Scripts\Activate.ps1
-# Activate python virtualenv (Linux/Mac)
-source .venv/bin/activate
-
+# AI microservice
+cd ../AI-Service
+python -m venv .venv && .venv\Scripts\Activate.ps1   # Windows
+# source .venv/bin/activate                            # macOS/Linux
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+
+# Frontend
+cd ../Frontend && npm install
 ```
+
+### 3. Run Everything
+
+```bash
+# Terminal 1 — Redis (already running as a service, or via Docker)
+redis-server
+
+# Terminal 2 — AI microservice
+cd AI-Service && uvicorn main:app --reload --port 8000
+
+# Terminal 3 — Backend API
+cd Backend && npm run dev
+
+# Terminal 4 — Frontend
+cd Frontend && npm run dev
+```
+
+Open **http://localhost:5173** — the login page has one-click demo credential buttons for the NGO admin, volunteer, and super admin roles.
 
 ---
 
-## 📁 Repository Structure
+## 🔌 API Surface
 
-```
-ReliefSync-AI/
-├── Frontend/           # UI Single Page Application (React/Vite)
-│   ├── src/
-│   │   ├── components/ # Reusable layout components
-│   │   └── views/      # NGO, Volunteer & Admin Dashboards
-├── Backend/            # REST API Gateway
-│   ├── scripts/        # Database seeders & verification tools
-│   │   ├── createDemoData.js   # Main database seed utility
-│   │   └── testEmail.js        # SMTP configuration diagnostic script
-│   ├── src/
-│   │   ├── models/     # Document structures
-│   │   └── services/   # Business validation, email & matching engine
-├── AI-Service/         # FastAPI ML Pipelines
-│   ├── routes/         # Model inferencing endpoints
-│   └── services/       # PyTorch initialization & Cache controls
-└── assets/             # Layout visual assets & documentation banners
-```
+All routes are mounted under `/api`. Public routes need no auth; everything else requires a JWT bearer token, and `/super-admin/*` additionally requires the `super_admin` role.
+
+| Group | Examples | Notes |
+| :--- | :--- | :--- |
+| `auth` | `POST /auth/login`, `POST /auth/register-ngo` | NGO self-registration creates the NGO + its first admin in one call |
+| `public/complaints` | `POST /public/complaints`, `GET /public/complaints/:id` | Rate-limited, no login; tracking requires the private token |
+| `ngo` | `GET /ngo/case-offers`, `PATCH /ngo/case-offers/:id/respond` | NGO accept/reject drives atomic case claiming |
+| `volunteers` / `volunteer-offers` / `volunteer-assignments` | `PATCH /volunteers/me/availability`, `PATCH /volunteer-offers/:id/respond` | Volunteer self-service + NGO roster management |
+| `matching` / `assignments` | `GET /matching/needs/:id/recommendations` | Skill + location + workload + reliability scored ranking |
+| `super-admin` | `GET /super-admin/spam-queue`, `PATCH /super-admin/escalations/:id/resolve` | Coordinator-only oversight endpoints |
+
+Full request/response contracts are documented inline in each route's controller.
 
 ---
 
-## 🚀 Future Roadmap
+## 🗺️ Roadmap
 
-- [ ] **Background Task Queue**: Integrate Redis-backed job workers (e.g. BullMQ/Celery) to separate AI extraction from API endpoint lifecycles.
-- [ ] **GIS / Mapbox Integrations**: Direct volunteer mapping and location-based spatial filtering on live vector maps.
-- [ ] **Offline PWA Support**: Enable remote, offline report drafting via standard browser Service Workers.
-- [ ] **Vector Engine Migration**: Switch query similarity logic to a vector-native engine (Qdrant/Pinecone) for sub-millisecond volunteer matches.
+- [ ] **Automated test suite** — spam/emergency-protection cases, race conditions on NGO acceptance, redispatch idempotency, Redis fail-open behavior
+- [ ] **GIS-based matching** — real geospatial distance instead of text-based location matching
+- [ ] **Offline-capable public intake** — PWA support for drafting reports without connectivity
+- [ ] **Vector search engine migration** — move duplicate/similarity search to a dedicated vector store (Qdrant/pgvector) as volume grows
+- [ ] **Additional notification channels** — SMS/WhatsApp providers behind the existing outbox abstraction
 
 ---
 
-## ⚡ Performance Bottlenecks & Solutions
+<div align="center">
 
-### 1. Synchronous LLM Ingestion Latency
-*   **Context:** Generating needs from PDF documents requires a sequential call to the OpenAI API which takes 3-5s. Under high disaster traffic, this blocks server connections.
-*   **Frontend-focused Solution:** We will convert the API call to a non-blocking asynchronous task. The server will immediately return `202 Accepted` along with a job ID. The React frontend will display a sleek, animated skeleton/progress screen while polling for final completion status via WebSocket streams or simple polling, keeping the user interface extremely responsive and fluid.
+Built as a full-stack, AI-assisted systems project — safety-constrained triage, explainable hybrid decisions, and event-driven coordination over a from-scratch relief workflow.
 
-### 2. High-Overhead CPU Inference
-*   **Context:** Hugging Face text embedding and spam checks execute locally. When hosted on CPU instances, this spikes core utilization and triggers throttling.
-*   **Engineering Solution:** Offload model loops to serverless GPU inference clusters (such as Hugging Face Inference Endpoints or AWS SageMaker) and utilize Redis cache keys to bypass model calculations entirely for redundant payloads.
-
-### 3. Complex Geospatial Similarity Aggregation
-*   **Context:** Correlating volunteer coordinates and skill profiles in real-time requires expensive MongoDB `$geoNear` aggregate runs, leading to response latency.
-*   **Engineering Solution:** Offload high-dimensional vectors to a dedicated search store (e.g., Pinecone or Qdrant) allowing high-velocity approximate nearest neighbor searches.
+</div>

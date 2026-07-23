@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Brand */
+  --color-primary-50: hsl(263, 90%, 96%);
+  --color-primary-200: hsl(263, 88%, 86%);
+  --color-primary-400: hsl(263, 88%, 72%);
+  --color-primary: hsl(263, 85%, 64%);
+  --color-primary-600: hsl(263, 82%, 56%);
+  --color-primary-700: hsl(263, 78%, 46%);
+
+  --color-accent-200: hsl(187, 90%, 82%);
+  --color-accent: hsl(187, 92%, 46%);
+  --color-accent-600: hsl(187, 90%, 38%);
+
+  /* Semantic */
+  --color-success: hsl(142, 70%, 45%);
+  --color-success-bg: hsl(142, 70%, 45%, 12%);
+  --color-warning: hsl(38, 92%, 48%);
+  --color-warning-bg: hsl(38, 92%, 48%, 12%);
+  --color-danger: hsl(350, 89%, 56%);
+  --color-danger-bg: hsl(350, 89%, 56%, 12%);
+  --color-info: hsl(217, 91%, 60%);
+  --color-info-bg: hsl(217, 91%, 60%, 12%);
+
+  /* Surface / text (dark-first product) */
+  --color-canvas: hsl(222, 24%, 6%);
+  --color-surface: hsl(220, 20%, 9%);
+  --color-surface-raised: hsl(220, 20%, 12%);
+  --color-surface-input: hsl(220, 24%, 4%);
+  --color-border: hsl(222, 20%, 20%);
+  --color-border-hover: hsl(187, 80%, 50%, 30%);
+
+  --color-text: hsl(220, 40%, 98%);
+  --color-text-secondary: hsl(220, 14%, 72%);
+  --color-text-dim: hsl(220, 10%, 52%);
+
+  /* Type */
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+
+  /* Radius */
+  --radius-card: 1rem;
+  --radius-pill: 999px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-canvas text-text font-sans antialiased;
+    background-image:
+      linear-gradient(135deg, hsl(8 46% 18% / 28%) 0%, transparent 38%),
+      linear-gradient(315deg, hsl(177 55% 15% / 24%) 0%, transparent 42%);
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-bold tracking-tight;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(217 10% 40% / 25%); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(217 10% 50% / 40%); }
+}
+
+@layer components {
+  .glass {
+    @apply bg-surface/60 backdrop-blur-xl border border-border rounded-card shadow-[0_4px_24px_rgba(0,0,0,0.25)];
+  }
+
+  .glass-hover {
+    @apply transition-all duration-200 hover:border-border-hover hover:shadow-[0_8px_32px_rgba(0,0,0,0.35)] hover:-translate-y-0.5;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-br from-primary to-accent bg-clip-text text-transparent;
+  }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.35s ease-out both; }

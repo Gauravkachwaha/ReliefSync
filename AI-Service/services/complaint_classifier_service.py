@@ -8,6 +8,7 @@ from typing import Any
 from transformers import pipeline
 
 from services.cache_service import cache_service
+from services.openai_client_service import openai_client_service
 
 
 DEFAULT_MODEL_NAME = (
@@ -66,6 +67,13 @@ class ComplaintClassifierService:
         self._classifier = None
         self._load_error: str | None = None
         self._lock = threading.Lock()
+
+        self.openai_enabled = (
+            os.getenv("OPENAI_CLASSIFIER_ENABLED", "true")
+            .strip()
+            .lower()
+            == "true"
+        )
 
     def normalize_text(self, text: str) -> str:
         return " ".join(str(text).split())
@@ -215,6 +223,136 @@ class ComplaintClassifierService:
             "rankedScores": ranked_scores,
         }
 
+    def clamp01(self, value: Any) -> float:
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return 0.5
+
+        return round(max(0.0, min(1.0, value)), 6)
+
+    def sanitize_ranked_scores(
+        self,
+        raw: Any,
+        label_map: dict[str, str],
+    ) -> list[dict[str, Any]]:
+        if not isinstance(raw, list):
+            return []
+
+        ranked = []
+
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+
+            label = str(item.get("label") or "").upper()
+
+            if label not in label_map:
+                continue
+
+            ranked.append(
+                {
+                    "label": label,
+                    "description": label_map[label],
+                    "score": self.clamp01(item.get("score")),
+                }
+            )
+
+        ranked.sort(key=lambda entry: entry["score"], reverse=True)
+
+        return ranked
+
+    def sanitize_openai_prediction(
+        self,
+        raw: Any,
+        label_map: dict[str, str],
+        default_label: str,
+    ) -> dict[str, Any]:
+        raw = raw or {}
+
+        label = str(raw.get("label") or "").upper()
+
+        if label not in label_map:
+            label = default_label
+
+        return {
+            "label": label,
+            "confidence": self.clamp01(raw.get("confidence")),
+            "rankedScores": self.sanitize_ranked_scores(
+                raw.get("ranked"),
+                label_map,
+            ),
+        }
+
+    def classify_with_openai(self, clean_text: str) -> dict[str, Any]:
+        if not self.openai_enabled:
+            raise RuntimeError("OpenAI classifier is disabled")
+
+        category_options = list(CATEGORY_LABELS.keys())
+        severity_options = list(SEVERITY_LABELS.keys())
+
+        system_prompt = (
+            "You are a triage classifier for a disaster/community relief "
+            "platform. Given a citizen's complaint text, classify it.\n"
+            f"category must be exactly one of: {', '.join(category_options)}.\n"
+            f"severity must be exactly one of: {', '.join(severity_options)}. "
+            "CRITICAL means immediate life-threatening danger only.\n"
+            "For both category and severity, return a confidence between 0 "
+            "and 1, and a ranked list (most to least likely) of ALL the "
+            "option labels, each with a score between 0 and 1.\n"
+            "Respond ONLY with JSON of the shape: "
+            '{"category": {"label": "...", "confidence": 0.0, '
+            '"ranked": [{"label": "...", "score": 0.0}, ...]}, '
+            '"severity": {"label": "...", "confidence": 0.0, '
+            '"ranked": [{"label": "...", "score": 0.0}, ...]}}'
+        )
+
+        raw = openai_client_service.complete_json(
+            system_prompt=system_prompt,
+            user_prompt=clean_text,
+        )
+
+        category_result = self.sanitize_openai_prediction(
+            raw.get("category"),
+            CATEGORY_LABELS,
+            "GENERAL_SUPPORT",
+        )
+
+        severity_result = self.sanitize_openai_prediction(
+            raw.get("severity"),
+            SEVERITY_LABELS,
+            "MEDIUM",
+        )
+
+        return {
+            "modelName": f"openai:{openai_client_service.model_name}",
+            "category": category_result,
+            "severity": severity_result,
+            "shadowMode": True,
+        }
+
+    def classify_with_local_model(self, clean_text: str) -> dict[str, Any]:
+        self.ensure_loaded()
+
+        category_result = self.get_top_prediction(
+            text=clean_text,
+            label_map=CATEGORY_LABELS,
+            hypothesis_template=CATEGORY_TEMPLATE,
+        )
+
+        severity_result = self.get_top_prediction(
+            text=clean_text,
+            label_map=SEVERITY_LABELS,
+            hypothesis_template=SEVERITY_TEMPLATE,
+        )
+
+        return {
+            "modelName": self.model_name,
+            "category": category_result,
+            "severity": severity_result,
+            "shadowMode": True,
+        }
+
     def classify(self, text: str) -> dict[str, Any]:
         clean_text = self.normalize_text(text)
 
@@ -238,26 +376,15 @@ class ComplaintClassifierService:
                 "cacheHit": True,
             }
 
-        self.ensure_loaded()
+        try:
+            result = self.classify_with_openai(clean_text)
+        except Exception as error:
+            print(
+                "⚠️ OpenAI classification unavailable, falling back to "
+                f"local zero-shot model: {error}"
+            )
 
-        category_result = self.get_top_prediction(
-            text=clean_text,
-            label_map=CATEGORY_LABELS,
-            hypothesis_template=CATEGORY_TEMPLATE,
-        )
-
-        severity_result = self.get_top_prediction(
-            text=clean_text,
-            label_map=SEVERITY_LABELS,
-            hypothesis_template=SEVERITY_TEMPLATE,
-        )
-
-        result = {
-            "modelName": self.model_name,
-            "category": category_result,
-            "severity": severity_result,
-            "shadowMode": True,
-        }
+            result = self.classify_with_local_model(clean_text)
 
         cache_was_saved = cache_service.set_json(
             "complaint-classifier",

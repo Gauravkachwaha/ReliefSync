@@ -145,6 +145,21 @@ class NotificationRepository {
     );
   }
 
+  async findStuckQueued(cutoffDate, limit) {
+    return await NotificationLog.find({
+      status: "QUEUED",
+      bullMqJobId: null,
+      createdAt: {
+        $lte: cutoffDate,
+      },
+    })
+      .sort({
+        createdAt: 1,
+      })
+      .limit(limit)
+      .lean();
+  }
+
   async saveBullMqJobId(notificationId, jobId) {
     return await NotificationLog.findByIdAndUpdate(
       notificationId,

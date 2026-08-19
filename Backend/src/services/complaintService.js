@@ -607,7 +607,7 @@ class ComplaintService {
     };
   }
 
-  async getTrackedComplaint(complaintId, trackingToken) {
+  async loadComplaintByTrackingToken(complaintId, trackingToken) {
     const complaint =
       await complaintRepository.findByComplaintIdWithTrackingHash(complaintId);
 
@@ -641,6 +641,15 @@ class ComplaintService {
       throw invalidTrackingAccess();
     }
 
+    return complaint;
+  }
+
+  async getTrackedComplaint(complaintId, trackingToken) {
+    const complaint = await this.loadComplaintByTrackingToken(
+      complaintId,
+      trackingToken,
+    );
+
     return {
       complaintId: complaint.complaintId,
       sourceType: complaint.sourceType,
@@ -661,6 +670,64 @@ class ComplaintService {
       createdAt: complaint.createdAt,
       updatedAt: complaint.updatedAt,
       feedback: complaint.feedback || null,
+    };
+  }
+
+  // Resolves the "NEEDS_CLARIFICATION" dead end: the citizen answers the
+  // clarification questions from their tracking link, the answer is folded
+  // into the complaint text, and extraction/classification/routing re-run
+  // from scratch exactly like a first-time submission.
+  async submitClarification({
+    complaintId,
+    trackingToken,
+    additionalText,
+    locationHint,
+  }) {
+    const complaint = await this.loadComplaintByTrackingToken(
+      complaintId,
+      trackingToken,
+    );
+
+    if (complaint.status !== "NEEDS_CLARIFICATION") {
+      const error = new Error(
+        "This complaint is not currently awaiting clarification",
+      );
+
+      error.status = 400;
+
+      throw error;
+    }
+
+    const cleanAdditionalText = additionalText.trim();
+
+    const mergedText = `${complaint.originalText}\n\nAdditional details: ${cleanAdditionalText}`.slice(
+      0,
+      5000,
+    );
+
+    const cleanLocationHint =
+      locationHint?.trim() || complaint.locationHint || null;
+
+    const updatedComplaint = await complaintRepository.updateById(
+      complaint._id,
+      {
+        originalText: mergedText,
+        locationHint: cleanLocationHint,
+      },
+    );
+
+    const processedComplaint =
+      await this.processAllowedComplaint(updatedComplaint);
+
+    return {
+      complaintId: processedComplaint.complaintId,
+      status: processedComplaint.status,
+      needsClarification: Boolean(
+        processedComplaint.aiExtractedData?.needsClarification,
+      ),
+      clarificationQuestions:
+        processedComplaint.aiExtractedData?.clarificationQuestions || [],
+      message: this.getPublicMessage(processedComplaint.status),
     };
   }
 }

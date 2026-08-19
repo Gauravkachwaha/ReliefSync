@@ -1,5 +1,6 @@
 import assignmentRepository from "../repositories/assignmentRepository.js";
 import complaintRepository from "../repositories/complaintRepository.js";
+import needRepository from "../repositories/needRepository.js";
 import volunteerRepository from "../repositories/volunteerRepository.js";
 import ngoImpactService from "./ngoImpactService.js";
 
@@ -203,6 +204,33 @@ class VolunteerAssignmentService {
           console.error("NGO impact recalculation background error:", err.message);
         });
       }
+    } else if (updatedAssignment.needId && nextStatus === "completed") {
+      // Old Need-based workflow: the NGO used to be able to mark this
+      // "completed" directly. That's no longer allowed (see
+      // assignmentService.updateAssignmentStatus) — completion must be
+      // confirmed here, by the volunteer, same as the complaint workflow.
+      // The side effects the NGO's direct update used to perform now happen
+      // on this path instead.
+      try {
+        await needRepository.updateStatus(
+          updatedAssignment.needId,
+          ngoId,
+          "completed",
+        );
+      } catch (err) {
+        console.error(
+          `Failed to mark Need ${updatedAssignment.needId} completed:`,
+          err.message,
+        );
+      }
+
+      const updatedVolunteer = await volunteerRepository.update(
+        volunteer._id,
+        ngoId,
+        { availability: "available" },
+      );
+
+      workloadReleased = Boolean(updatedVolunteer);
     }
 
     return {

@@ -1,27 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import { ClipboardCheck } from "lucide-react";
-import { Card, Badge, Button, Spinner, EmptyState, ErrorState, ConfirmDialog } from "../../components/ui";
-import { useAssignments, useUpdateAssignmentStatus } from "../../hooks/api/useAssignments";
-import { useToast } from "../../context/ToastContext";
+import { Card, Badge, Spinner, EmptyState, ErrorState } from "../../components/ui";
+import { useAssignments } from "../../hooks/api/useAssignments";
 
 const fmt = (d) => (d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "");
 
 export default function Assignments() {
   const { data: assignments, isLoading, isError, refetch } = useAssignments();
-  const updateStatus = useUpdateAssignmentStatus();
-  const toast = useToast();
-  const [confirmId, setConfirmId] = useState(null);
-
-  const handleComplete = async () => {
-    try {
-      const res = await updateStatus.mutateAsync({ id: confirmId, status: "completed", notes: "NGO Admin completed task." });
-      if (res.success) toast.success("Assignment marked complete");
-    } catch (err) {
-      toast.error("Update failed", err.message);
-    } finally {
-      setConfirmId(null);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-6 animate-fade-up">
@@ -56,26 +41,14 @@ export default function Assignments() {
                 <p className="text-xs text-text-dim bg-black/5 rounded-lg px-3 py-2 mb-2">{a.notes}</p>
               )}
               {a.status !== "completed" && (
-                <div className="flex justify-end pt-2 border-t border-border">
-                  <Button size="sm" variant="success" onClick={() => setConfirmId(a._id)}>
-                    Mark Completed
-                  </Button>
-                </div>
+                <p className="text-[11px] text-text-dim pt-2 border-t border-border">
+                  Awaiting the volunteer to confirm completion from their own app.
+                </p>
               )}
             </Card>
           ))}
         </div>
       )}
-
-      <ConfirmDialog
-        isOpen={!!confirmId}
-        onClose={() => setConfirmId(null)}
-        onConfirm={handleComplete}
-        title="Complete assignment?"
-        message="This will mark the task as completed and free up the volunteer's capacity."
-        confirmLabel="Mark Completed"
-        loading={updateStatus.isPending}
-      />
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import assignmentRepository from "../repositories/assignmentRepository.js";
 import volunteerRepository from "../repositories/volunteerRepository.js";
-import needRepository from "../repositories/needRepository.js";
 import emailService from "./emailService.js";
 
 class AssignmentService {
@@ -40,39 +39,24 @@ class AssignmentService {
   }
 
   async updateAssignmentStatus(id, ngoId, status, notes = "") {
+    // Completion must be confirmed by the volunteer themselves, via
+    // PATCH /api/volunteer-assignments/:id/progress — never set directly by
+    // the NGO. This keeps "is this task actually done" consistent with the
+    // complaint-driven assignment flow, where the NGO has no such override.
+    if (status === "completed") {
+      const error = new Error(
+        "An assignment can only be marked completed by the volunteer confirming their own progress, not by the NGO directly.",
+      );
+      error.status = 400;
+      throw error;
+    }
+
     const assignment = await assignmentRepository.updateStatus(
       id,
       ngoId,
       status,
       notes,
     );
-
-    // When assignment is completed → diminish the Need + make volunteer available
-    if (status === "completed") {
-      try {
-        const assignmentData = await assignmentRepository.findById(id, ngoId);
-
-        if (assignmentData && assignmentData.needId) {
-          // Diminish the Need (mark as completed)
-          await needRepository.updateStatus(
-            assignmentData.needId,
-            ngoId,
-            "completed",
-          );
-          console.log(`✅ Need marked as completed / diminished`);
-        }
-
-        if (assignmentData && assignmentData.volunteerId) {
-          // Make volunteer available again
-          await volunteerRepository.update(assignmentData.volunteerId, ngoId, {
-            availability: "available",
-          });
-          console.log(`✅ Volunteer status changed back to available`);
-        }
-      } catch (err) {
-        console.error("Failed to update status after completion:", err.message);
-      }
-    }
 
     return assignment;
   }

@@ -2,12 +2,86 @@ import complaintRepository from "../repositories/complaintRepository.js";
 import volunteerRepository from "../repositories/volunteerRepository.js";
 import volunteerOfferRepository from "../repositories/volunteerOfferRepository.js";
 import agentLogService from "./agentLogService.js";
-import emailService from "./emailService.js";
+import notificationService from "./notificationService.js";
 
 const MAX_PENDING_VOLUNTEER_OFFERS = 7;
 const OFFER_BUFFER = 2;
 
 class VolunteerMatchingService {
+  isVolunteerOfferNotificationEnabled() {
+    return (
+      String(process.env.NOTIFICATION_VOLUNTEER_OFFER_ENABLED || "true")
+        .trim()
+        .toLowerCase() === "true"
+    );
+  }
+
+  buildVolunteerOfferEmailBody(complaint) {
+    return (
+      `🚨 NEW EMERGENCY ASSIGNMENT OFFER\n\n` +
+      `You have received a new emergency response offer from your NGO.\n\n` +
+      `Incident ID: ${complaint.complaintId}\n` +
+      `Category: ${complaint.category || "General Support"}\n` +
+      `Severity: ${complaint.severity || "Medium"}\n` +
+      `Location Landmark: ${complaint.locationHint || "General"}\n\n` +
+      `AI Incident Summary:\n"${complaint.aiExtractedData?.summary || complaint.originalText || "No summary available."}"\n\n` +
+      `Please log in to your Volunteer Portal immediately to accept or decline this offer before it expires.\n\n` +
+      `Thank you for your service!\nReliefSync AI Team`
+    );
+  }
+
+  async queueVolunteerOfferNotifications({ complaint, offers }) {
+    if (!this.isVolunteerOfferNotificationEnabled() || offers.length === 0) {
+      return;
+    }
+
+    // Routed through the idempotent outbox (same reliability guarantees —
+    // retry, audit trail — as every other notification in the system),
+    // instead of firing an un-queued, un-retried email directly.
+    const results = await Promise.allSettled(
+      offers.map(({ volunteer, offer }) =>
+        notificationService.createAndQueueNotification({
+          idempotencyKey: `volunteer-case-offer-${offer._id}`,
+
+          type: "VOLUNTEER_CASE_OFFER_CREATED",
+
+          recipientType: "VOLUNTEER",
+
+          recipientUserId: volunteer.userId || null,
+
+          volunteerId: volunteer._id,
+
+          complaintId: complaint._id,
+
+          volunteerOfferId: offer._id,
+
+          channel: volunteer.email ? "EMAIL" : "CONSOLE",
+
+          subject: `🚨 Urgent Job Offer: ${complaint.complaintId}`,
+
+          message: this.buildVolunteerOfferEmailBody(complaint),
+
+          payload: {
+            complaintPublicId: complaint.complaintId,
+            category: complaint.category || null,
+            severity: complaint.severity || null,
+            locationHint: complaint.locationHint || null,
+            expiresAt: offer.expiresAt,
+            recipientEmail: volunteer.email || null,
+          },
+        }),
+      ),
+    );
+
+    for (const result of results) {
+      if (result.status === "rejected") {
+        console.warn(
+          `⚠️ Volunteer notification could not be created: ${result.reason?.message || "Unknown error"}`,
+        );
+      }
+    }
+  }
+
   normalizeValue(value = "") {
     return String(value)
       .toLowerCase()
@@ -267,6 +341,7 @@ class VolunteerMatchingService {
     );
 
     const createdOffers = [];
+    const notificationTargets = [];
 
     for (const candidate of selectedCandidates) {
       try {
@@ -283,13 +358,7 @@ class VolunteerMatchingService {
         });
 
         createdOffers.push(offer);
-
-        // Send email alert to volunteer
-        if (candidate.volunteer && candidate.volunteer.email) {
-          emailService.sendVolunteerOfferAlert(candidate.volunteer.email, complaint).catch((err) => {
-            console.error(`❌ Background email to volunteer ${candidate.volunteer.email} failed:`, err.message);
-          });
-        }
+        notificationTargets.push({ volunteer: candidate.volunteer, offer });
       } catch (error) {
         if (error?.code === 11000) {
           continue;
@@ -298,6 +367,11 @@ class VolunteerMatchingService {
         throw error;
       }
     }
+
+    await this.queueVolunteerOfferNotifications({
+      complaint,
+      offers: notificationTargets,
+    });
 
     let updatedComplaint = complaint;
 

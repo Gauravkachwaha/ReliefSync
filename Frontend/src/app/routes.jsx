@@ -43,7 +43,7 @@ export default function AppRoutes() {
         <Route path="/register-ngo" element={<RegisterNgo />} />
       </Route>
 
-      <Route element={<RequireRole role="admin" />}>
+      <Route element={<RequireRole roles={["admin", "coordinator"]} />}>
         <Route element={<NgoAppLayout />}>
           <Route path="/ngo" element={<Overview />} />
           <Route path="/ngo/case-offers" element={<CaseOffers />} />

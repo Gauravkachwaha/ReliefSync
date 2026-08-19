@@ -1,5 +1,53 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+let refreshRequest = null;
+
+const clearSession = () => {
+  localStorage.removeItem("reliefsync_token");
+  localStorage.removeItem("reliefsync_user");
+  window.dispatchEvent(new Event("reliefsync:logout"));
+};
+
+const refreshAccessToken = async () => {
+  if (!refreshRequest) {
+    refreshRequest = globalThis.fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    }).then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.data?.token) throw new Error("Session expired");
+      localStorage.setItem("reliefsync_token", data.data.token);
+      if (data.data.user) {
+        localStorage.setItem("reliefsync_user", JSON.stringify(data.data.user));
+      }
+      return data.data.token;
+    }).finally(() => {
+      refreshRequest = null;
+    });
+  }
+  return refreshRequest;
+};
+
+const apiFetch = async (url, options = {}) => {
+  const requestOptions = { ...options, credentials: "include" };
+  let response = await globalThis.fetch(url, requestOptions);
+
+  const isAuthRequest = url.startsWith(`${API_URL}/auth/`);
+  if (response.status !== 401 || isAuthRequest || !localStorage.getItem("reliefsync_token")) {
+    return response;
+  }
+
+  try {
+    const newToken = await refreshAccessToken();
+    const retryHeaders = new Headers(requestOptions.headers || {});
+    retryHeaders.set("Authorization", `Bearer ${newToken}`);
+    response = await globalThis.fetch(url, { ...requestOptions, headers: retryHeaders });
+  } catch {
+    clearSession();
+  }
+  return response;
+};
+
 const getHeaders = () => {
   const token = localStorage.getItem("reliefsync_token");
   const headers = {
@@ -23,9 +71,10 @@ export const api = {
   // Authentication
   auth: {
     login: async (email, password) => {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await apiFetch(`${API_URL}/auth/login`, {
         method: "POST",
         headers: getHeaders(),
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const responseData = await handleResponse(res);
@@ -36,16 +85,27 @@ export const api = {
       return responseData;
     },
     registerNgo: async (ngo, admin) => {
-      const res = await fetch(`${API_URL}/auth/register-ngo`, {
+      const res = await apiFetch(`${API_URL}/auth/register-ngo`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ ngo, admin }),
       });
-      return handleResponse(res);
+      const responseData = await handleResponse(res);
+      if (responseData.success && responseData.data?.token) {
+        localStorage.setItem("reliefsync_token", responseData.data.token);
+        localStorage.setItem("reliefsync_user", JSON.stringify(responseData.data.admin));
+      }
+      return responseData;
     },
-    logout: () => {
-      localStorage.removeItem("reliefsync_token");
-      localStorage.removeItem("reliefsync_user");
+    logout: async () => {
+      try {
+        await globalThis.fetch(`${API_URL}/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+        });
+      } finally {
+        clearSession();
+      }
     },
     getCurrentUser: () => {
       try {
@@ -62,7 +122,7 @@ export const api = {
   // Public Complaints
   public: {
     submitComplaint: async (text, locationHint, sourceType = "TEXT") => {
-      const res = await fetch(`${API_URL}/public/complaints`, {
+      const res = await apiFetch(`${API_URL}/public/complaints`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, locationHint, sourceType }),
@@ -70,21 +130,21 @@ export const api = {
       return handleResponse(res);
     },
     trackComplaint: async (complaintId, token) => {
-      const res = await fetch(`${API_URL}/public/complaints/${complaintId}?token=${encodeURIComponent(token)}`, {
+      const res = await apiFetch(`${API_URL}/public/complaints/${complaintId}?token=${encodeURIComponent(token)}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
       return handleResponse(res);
     },
     getNgos: async () => {
-      const res = await fetch(`${API_URL}/public/ngos`, {
+      const res = await apiFetch(`${API_URL}/public/ngos`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
       return handleResponse(res);
     },
     submitFeedback: async (complaintId, token, rating, comments) => {
-      const res = await fetch(`${API_URL}/public/complaints/${complaintId}/feedback`, {
+      const res = await apiFetch(`${API_URL}/public/complaints/${complaintId}/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, rating, comments }),
@@ -96,14 +156,14 @@ export const api = {
   // NGO Management
   ngo: {
     getProfile: async () => {
-      const res = await fetch(`${API_URL}/ngo/me`, {
+      const res = await apiFetch(`${API_URL}/ngo/me`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     updateProfile: async (profileData) => {
-      const res = await fetch(`${API_URL}/ngo/me`, {
+      const res = await apiFetch(`${API_URL}/ngo/me`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify(profileData),
@@ -111,14 +171,14 @@ export const api = {
       return handleResponse(res);
     },
     getCaseOffers: async (status = "PENDING") => {
-      const res = await fetch(`${API_URL}/ngo/case-offers?status=${status}`, {
+      const res = await apiFetch(`${API_URL}/ngo/case-offers?status=${status}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     respondToCaseOffer: async (offerId, decision) => {
-      const res = await fetch(`${API_URL}/ngo/case-offers/${offerId}/respond`, {
+      const res = await apiFetch(`${API_URL}/ngo/case-offers/${offerId}/respond`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ decision }),
@@ -130,21 +190,21 @@ export const api = {
   // Volunteers Management (NGO Admin)
   volunteers: {
     list: async () => {
-      const res = await fetch(`${API_URL}/volunteers`, {
+      const res = await apiFetch(`${API_URL}/volunteers`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getById: async (id) => {
-      const res = await fetch(`${API_URL}/volunteers/${id}`, {
+      const res = await apiFetch(`${API_URL}/volunteers/${id}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     create: async (volunteerData) => {
-      const res = await fetch(`${API_URL}/volunteers`, {
+      const res = await apiFetch(`${API_URL}/volunteers`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify(volunteerData),
@@ -152,7 +212,7 @@ export const api = {
       return handleResponse(res);
     },
     update: async (id, volunteerData) => {
-      const res = await fetch(`${API_URL}/volunteers/${id}`, {
+      const res = await apiFetch(`${API_URL}/volunteers/${id}`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify(volunteerData),
@@ -160,7 +220,7 @@ export const api = {
       return handleResponse(res);
     },
     createLoginAccount: async (id, password) => {
-      const res = await fetch(`${API_URL}/volunteers/${id}/account`, {
+      const res = await apiFetch(`${API_URL}/volunteers/${id}/account`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ password }),
@@ -169,14 +229,14 @@ export const api = {
     },
     // For Volunteer's own actions
     getMyProfile: async () => {
-      const res = await fetch(`${API_URL}/volunteers/me`, {
+      const res = await apiFetch(`${API_URL}/volunteers/me`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     updateMyAvailability: async (availability) => {
-      const res = await fetch(`${API_URL}/volunteers/me/availability`, {
+      const res = await apiFetch(`${API_URL}/volunteers/me/availability`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ availability }),
@@ -188,21 +248,21 @@ export const api = {
   // Volunteer Offers (For both NGO and Volunteer)
   volunteerOffers: {
     getNgoOffers: async (status = "PENDING") => {
-      const res = await fetch(`${API_URL}/volunteer-offers/ngo?status=${status}`, {
+      const res = await apiFetch(`${API_URL}/volunteer-offers/ngo?status=${status}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getMyOffers: async (status = "PENDING") => {
-      const res = await fetch(`${API_URL}/volunteer-offers/me?status=${status}`, {
+      const res = await apiFetch(`${API_URL}/volunteer-offers/me?status=${status}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     respondToOffer: async (offerId, decision) => {
-      const res = await fetch(`${API_URL}/volunteer-offers/${offerId}/respond`, {
+      const res = await apiFetch(`${API_URL}/volunteer-offers/${offerId}/respond`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ decision }),
@@ -214,7 +274,7 @@ export const api = {
   // Matching recommendations
   matching: {
     getRecommendations: async (needId) => {
-      const res = await fetch(`${API_URL}/matching/needs/${needId}/recommendations`, {
+      const res = await apiFetch(`${API_URL}/matching/needs/${needId}/recommendations`, {
         method: "GET",
         headers: getHeaders(),
       });
@@ -225,7 +285,7 @@ export const api = {
   // Assignments
   assignments: {
     create: async (needId, volunteerId) => {
-      const res = await fetch(`${API_URL}/assignments`, {
+      const res = await apiFetch(`${API_URL}/assignments`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ needId, volunteerId }),
@@ -233,14 +293,14 @@ export const api = {
       return handleResponse(res);
     },
     list: async () => {
-      const res = await fetch(`${API_URL}/assignments`, {
+      const res = await apiFetch(`${API_URL}/assignments`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     updateStatus: async (id, status, notes) => {
-      const res = await fetch(`${API_URL}/assignments/${id}/status`, {
+      const res = await apiFetch(`${API_URL}/assignments/${id}/status`, {
         method: "PUT",
         headers: getHeaders(),
         body: JSON.stringify({ status, notes }),
@@ -249,14 +309,14 @@ export const api = {
     },
     // For Volunteer's own assignments
     getMyAssignments: async () => {
-      const res = await fetch(`${API_URL}/volunteer-assignments/me`, {
+      const res = await apiFetch(`${API_URL}/volunteer-assignments/me`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     updateMyAssignmentProgress: async (assignmentId, status, notes) => {
-      const res = await fetch(`${API_URL}/volunteer-assignments/${assignmentId}/progress`, {
+      const res = await apiFetch(`${API_URL}/volunteer-assignments/${assignmentId}/progress`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ status, notes }),
@@ -268,14 +328,14 @@ export const api = {
   // Needs (NGO Claimed Complaints)
   needs: {
     list: async () => {
-      const res = await fetch(`${API_URL}/needs`, {
+      const res = await apiFetch(`${API_URL}/needs`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getById: async (id) => {
-      const res = await fetch(`${API_URL}/needs/${id}`, {
+      const res = await apiFetch(`${API_URL}/needs/${id}`, {
         method: "GET",
         headers: getHeaders(),
       });
@@ -286,21 +346,21 @@ export const api = {
   // Reports
   reports: {
     list: async () => {
-      const res = await fetch(`${API_URL}/reports`, {
+      const res = await apiFetch(`${API_URL}/reports`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getById: async (id) => {
-      const res = await fetch(`${API_URL}/reports/${id}`, {
+      const res = await apiFetch(`${API_URL}/reports/${id}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     submitText: async (title, content) => {
-      const res = await fetch(`${API_URL}/reports/text`, {
+      const res = await apiFetch(`${API_URL}/reports/text`, {
         method: "POST",
         headers: getHeaders(),
         body: JSON.stringify({ title, text: content }),
@@ -318,7 +378,7 @@ export const api = {
         headers["Authorization"] = `Bearer ${token}`;
       }
       
-      const res = await fetch(`${API_URL}/reports/pdf`, {
+      const res = await apiFetch(`${API_URL}/reports/pdf`, {
         method: "POST",
         headers,
         body: formData,
@@ -330,28 +390,28 @@ export const api = {
   // Dashboard Overview
   dashboard: {
     getOverview: async () => {
-      const res = await fetch(`${API_URL}/dashboard/overview`, {
+      const res = await apiFetch(`${API_URL}/dashboard/overview`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getCriticalNeeds: async () => {
-      const res = await fetch(`${API_URL}/dashboard/critical-needs`, {
+      const res = await apiFetch(`${API_URL}/dashboard/critical-needs`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getActiveAssignments: async () => {
-      const res = await fetch(`${API_URL}/dashboard/active-assignments`, {
+      const res = await apiFetch(`${API_URL}/dashboard/active-assignments`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getVolunteerStats: async () => {
-      const res = await fetch(`${API_URL}/dashboard/volunteer-stats`, {
+      const res = await apiFetch(`${API_URL}/dashboard/volunteer-stats`, {
         method: "GET",
         headers: getHeaders(),
       });
@@ -362,14 +422,14 @@ export const api = {
   // Super Admin Management
   superAdmin: {
     getNgoVerificationQueue: async (status = "PENDING") => {
-      const res = await fetch(`${API_URL}/super-admin/ngos?status=${status}`, {
+      const res = await apiFetch(`${API_URL}/super-admin/ngos?status=${status}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     updateNgoVerification: async (ngoId, verificationStatus) => {
-      const res = await fetch(`${API_URL}/super-admin/ngos/${ngoId}/verification`, {
+      const res = await apiFetch(`${API_URL}/super-admin/ngos/${ngoId}/verification`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ verificationStatus }),
@@ -377,14 +437,14 @@ export const api = {
       return handleResponse(res);
     },
     getSpamReviewQueue: async () => {
-      const res = await fetch(`${API_URL}/super-admin/spam-queue`, {
+      const res = await apiFetch(`${API_URL}/super-admin/spam-queue`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     resolveSpamReview: async (complaintId, decision) => {
-      const res = await fetch(`${API_URL}/super-admin/spam-queue/${complaintId}/decision`, {
+      const res = await apiFetch(`${API_URL}/super-admin/spam-queue/${complaintId}/decision`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ decision }),
@@ -392,14 +452,14 @@ export const api = {
       return handleResponse(res);
     },
     getEscalations: async (status = "OPEN") => {
-      const res = await fetch(`${API_URL}/super-admin/escalations?status=${status}`, {
+      const res = await apiFetch(`${API_URL}/super-admin/escalations?status=${status}`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     resolveEscalation: async (escalationId, resolvedNote) => {
-      const res = await fetch(`${API_URL}/super-admin/escalations/${escalationId}/resolve`, {
+      const res = await apiFetch(`${API_URL}/super-admin/escalations/${escalationId}/resolve`, {
         method: "PATCH",
         headers: getHeaders(),
         body: JSON.stringify({ resolvedNote }),
@@ -407,14 +467,14 @@ export const api = {
       return handleResponse(res);
     },
     getAuditLogs: async () => {
-      const res = await fetch(`${API_URL}/super-admin/audit-logs`, {
+      const res = await apiFetch(`${API_URL}/super-admin/audit-logs`, {
         method: "GET",
         headers: getHeaders(),
       });
       return handleResponse(res);
     },
     getAnalytics: async () => {
-      const res = await fetch(`${API_URL}/super-admin/analytics`, {
+      const res = await apiFetch(`${API_URL}/super-admin/analytics`, {
         method: "GET",
         headers: getHeaders(),
       });

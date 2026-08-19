@@ -16,16 +16,39 @@ const getTransporter = () => {
 };
 
 class EmailService {
-  async sendEmail(to, subject, text) {
+  // Checks the SMTP connection/credentials without sending anything.
+  // Throws with the underlying SMTP error when the connection is broken.
+  async verifyConnection() {
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASS;
+
+    if (!user || !pass || user.includes("example") || pass.includes("password")) {
+      throw new Error(
+        "EMAIL_USER / EMAIL_PASS not configured — emails will use the console fallback.",
+      );
+    }
+
+    await getTransporter().verify();
+    return true;
+  }
+
+  // throwOnFailure: used by the notification outbox worker, which needs a
+  // real exception to trigger BullMQ retries. Unconfigured SMTP is treated
+  // as expected dev/demo behavior (console fallback, never throws) — only a
+  // genuine SMTP send failure with configured credentials throws.
+  async sendEmail(to, subject, text, { throwOnFailure = false } = {}) {
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASS;
+
+    const isConfigured =
+      user && pass && !user.includes("example") && !pass.includes("password");
+
+    if (!isConfigured) {
+      console.log(`✉️ [Console Email Fallback] To: ${to}\nSubject: ${subject}\nBody: ${text}\n`);
+      return true;
+    }
+
     try {
-      const user = process.env.EMAIL_USER;
-      const pass = process.env.EMAIL_PASS;
-
-      if (!user || !pass || user.includes("example") || pass.includes("password")) {
-        console.log(`✉️ [Console Email Fallback] To: ${to}\nSubject: ${subject}\nBody: ${text}\n`);
-        return true;
-      }
-
       const client = getTransporter();
       await client.sendMail({
         from: `"ReliefSync AI" <${user}>`,
@@ -36,7 +59,12 @@ class EmailService {
       console.log(`✅ Email sent successfully to ${to}`);
       return true;
     } catch (err) {
-      console.warn("⚠️ SMTP Email delivery failed, falling back to console log:", err.message);
+      console.warn("⚠️ SMTP Email delivery failed:", err.message);
+
+      if (throwOnFailure) {
+        throw err;
+      }
+
       console.log(`✉️ [Console Email Fallback] To: ${to}\nSubject: ${subject}\nBody: ${text}\n`);
       return true;
     }

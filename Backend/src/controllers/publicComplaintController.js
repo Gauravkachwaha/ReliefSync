@@ -167,4 +167,66 @@ const submitComplaintFeedback = async (req, res, next) => {
   }
 };
 
-export { submitGuestComplaint, trackGuestComplaint, submitComplaintFeedback };
+const submitComplaintClarification = async (req, res, next) => {
+  try {
+    const { complaintId } = req.params;
+    const { token, additionalText, locationHint } = req.body || {};
+
+    if (typeof token !== "string" || token.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "A valid private tracking token is required",
+      });
+    }
+
+    if (
+      typeof additionalText !== "string" ||
+      additionalText.trim().length < 3
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "additionalText must contain at least 3 characters",
+      });
+    }
+
+    if (additionalText.trim().length > 2000) {
+      return res.status(400).json({
+        success: false,
+        message: "additionalText cannot exceed 2000 characters",
+      });
+    }
+
+    if (
+      locationHint !== undefined &&
+      locationHint !== null &&
+      (typeof locationHint !== "string" || locationHint.trim().length > 300)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "locationHint must be text with at most 300 characters",
+      });
+    }
+
+    const result = await complaintService.submitClarification({
+      complaintId,
+      trackingToken: token,
+      additionalText,
+      locationHint,
+    });
+
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export {
+  submitGuestComplaint,
+  trackGuestComplaint,
+  submitComplaintFeedback,
+  submitComplaintClarification,
+};

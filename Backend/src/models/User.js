@@ -44,6 +44,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    // Hashes only: raw refresh tokens are never persisted. Keeping a small
+    // collection supports multiple browsers/devices and server-side revocation.
+    refreshTokenHashes: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   { timestamps: true },
 );
@@ -51,6 +59,7 @@ const userSchema = new mongoose.Schema(
 userSchema.set("toJSON", {
   transform: (document, returnedObject) => {
     delete returnedObject.password;
+    delete returnedObject.refreshTokenHashes;
     return returnedObject;
   },
 });

@@ -1,5 +1,6 @@
 import express from "express";
 import protect from "../middlewares/authMiddleware.js";
+import { requireNgoMembership } from "../middlewares/authorizationMiddleware.js";
 import {
   getMyVolunteerOffers,
   getNgoVolunteerOffers,
@@ -9,6 +10,7 @@ import {
 const router = express.Router();
 
 router.use(protect);
+router.use(requireNgoMembership);
 
 // Keep these above /:offerId/respond.
 router.get("/ngo", getNgoVolunteerOffers);

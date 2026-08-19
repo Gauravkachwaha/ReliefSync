@@ -2,11 +2,14 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import userRepository from "../repositories/userRepository.js";
 import ngoRepository from "../repositories/ngoRepository.js";
+import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || JWT_SECRET;
+const MAX_REFRESH_SESSIONS = 5;
 
 class AuthService {
-  createToken(user) {
+  createAccessToken(user) {
     const payload = {
       id: user._id,
       role: user.role,
@@ -18,8 +21,32 @@ class AuthService {
     }
 
     return jwt.sign(payload, JWT_SECRET, {
-      expiresIn: "7d",
+      expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "15m",
     });
+  }
+
+  createRefreshToken(user) {
+    return jwt.sign(
+      { id: user._id, type: "refresh", jti: crypto.randomUUID() },
+      JWT_REFRESH_SECRET,
+      { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d" },
+    );
+  }
+
+  hashRefreshToken(token) {
+    return crypto.createHash("sha256").update(token).digest("hex");
+  }
+
+  async issueTokenPair(user) {
+    const accessToken = this.createAccessToken(user);
+    const refreshToken = this.createRefreshToken(user);
+    await userRepository.addRefreshTokenHash(
+      user._id,
+      this.hashRefreshToken(refreshToken),
+      MAX_REFRESH_SESSIONS,
+    );
+
+    return { accessToken, refreshToken };
   }
 
   async registerNgo(ngoData, adminData) {
@@ -45,12 +72,13 @@ class AuthService {
     ngo.createdBy = admin._id;
     await ngo.save();
 
-    const token = this.createToken(admin);
+    const { accessToken: token, refreshToken } = await this.issueTokenPair(admin);
 
     return {
       ngo,
       admin,
       token,
+      refreshToken,
     };
   }
 
@@ -58,21 +86,83 @@ class AuthService {
     const user = await userRepository.findByEmail(email);
 
     if (!user || !user.isActive) {
-      throw new Error("Invalid credentials");
+      const error = new Error("Invalid credentials");
+      error.status = 401;
+      throw error;
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      throw new Error("Invalid credentials");
+      const error = new Error("Invalid credentials");
+      error.status = 401;
+      throw error;
     }
 
-    const token = this.createToken(user);
+    const { accessToken: token, refreshToken } = await this.issueTokenPair(user);
 
     return {
       user,
       token,
+      refreshToken,
     };
+  }
+
+  async refresh(rawToken) {
+    if (!rawToken) {
+      const error = new Error("Refresh token is required");
+      error.status = 401;
+      throw error;
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(rawToken, JWT_REFRESH_SECRET);
+    } catch {
+      const error = new Error("Invalid or expired refresh token");
+      error.status = 401;
+      throw error;
+    }
+
+    if (payload.type !== "refresh") {
+      const error = new Error("Invalid refresh token");
+      error.status = 401;
+      throw error;
+    }
+
+    const user = await userRepository.findById(payload.id);
+    const oldHash = this.hashRefreshToken(rawToken);
+    if (!user || !user.isActive) {
+      const error = new Error("Refresh token has been revoked");
+      error.status = 401;
+      throw error;
+    }
+
+    const token = this.createAccessToken(user);
+    const refreshToken = this.createRefreshToken(user);
+    const rotatedUser = await userRepository.rotateRefreshTokenHash(
+      user._id,
+      oldHash,
+      this.hashRefreshToken(refreshToken),
+      MAX_REFRESH_SESSIONS,
+    );
+    if (!rotatedUser) {
+      const error = new Error("Refresh token has been revoked");
+      error.status = 401;
+      throw error;
+    }
+    return { user: rotatedUser, token, refreshToken };
+  }
+
+  async revokeRefreshToken(rawToken) {
+    if (!rawToken) return;
+    try {
+      const payload = jwt.verify(rawToken, JWT_REFRESH_SECRET, { ignoreExpiration: true });
+      const tokenHash = this.hashRefreshToken(rawToken);
+      await userRepository.removeRefreshTokenHash(payload.id, tokenHash);
+    } catch {
+      // Logout remains idempotent even for malformed/expired cookies.
+    }
   }
 
   verifyToken(token) {

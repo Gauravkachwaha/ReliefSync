@@ -8,6 +8,7 @@ import {
   getReportById,
 } from "../controllers/reportController.js";
 import protect from "../middlewares/authMiddleware.js";
+import { requireNgoMembership, requireRole } from "../middlewares/authorizationMiddleware.js";
 
 const router = express.Router();
 
@@ -37,6 +38,8 @@ const upload = multer({
 
 // All routes are protected
 router.use(protect);
+router.use(requireNgoMembership);
+router.use(requireRole("admin", "coordinator"));
 
 router.post("/text", createTextReport);
 router.post("/pdf", upload.single("pdf"), createPdfReport);

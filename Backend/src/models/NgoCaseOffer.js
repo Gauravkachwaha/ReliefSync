@@ -29,6 +29,13 @@ const ngoCaseOfferSchema = new mongoose.Schema(
       default: 1,
     },
 
+    // Ranking score computed by ngoRedispatchService.findRankedEligibleNgos
+    // at the time this offer was created. Used to sort offers by relevance.
+    matchScore: {
+      type: Number,
+      default: 0,
+    },
+
     // Deadline for NGO response.
     expiresAt: {
       type: Date,

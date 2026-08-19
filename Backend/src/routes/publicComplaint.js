@@ -4,6 +4,7 @@ import {
   submitGuestComplaint,
   trackGuestComplaint,
   submitComplaintFeedback,
+  submitComplaintClarification,
 } from "../controllers/publicComplaintController.js";
 
 const router = express.Router();
@@ -38,5 +39,7 @@ router.post("/", complaintSubmissionLimiter, submitGuestComplaint);
 router.get("/:complaintId", complaintTrackingLimiter, trackGuestComplaint);
 
 router.post("/:complaintId/feedback", complaintTrackingLimiter, submitComplaintFeedback);
+
+router.post("/:complaintId/clarify", complaintTrackingLimiter, submitComplaintClarification);
 
 export default router;

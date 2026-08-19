@@ -1,5 +1,6 @@
 import express from "express";
 import protect from "../middlewares/authMiddleware.js";
+import { requireNgoMembership } from "../middlewares/authorizationMiddleware.js";
 import {
   createVolunteer,
   createVolunteerLoginAccount,
@@ -13,6 +14,7 @@ import {
 const router = express.Router();
 
 router.use(protect);
+router.use(requireNgoMembership);
 
 // Keep these above "/:id", otherwise "me" would be treated as an ID.
 router.get("/me", getMyVolunteerProfile);

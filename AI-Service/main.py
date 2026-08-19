@@ -1,6 +1,16 @@
+import hmac
 import os
 import re
+import sys
 from typing import Any, List, Optional
+
+# Console encoding on Windows (cp1252/"charmap") can't print the emoji used
+# throughout this service's log lines, which crashes with a UnicodeEncodeError
+# (a ValueError subclass) the first time an endpoint tries to print one.
+# Force UTF-8 stdout/stderr so logging never takes down a request.
+if sys.stdout.encoding is None or sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from routes.spam_model import router as spam_model_router
 from routes.embedding_model import router as embedding_model_router
 from routes.complaint_classifier import (
@@ -8,6 +18,7 @@ from routes.complaint_classifier import (
 )
 from routes.cache import router as cache_router
 from services.cache_service import cache_service
+from services.openai_extraction_service import openai_extraction_service
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, Field
@@ -104,7 +115,7 @@ def verify_service_key(x_service_key: Optional[str]) -> None:
             detail="AI_SERVICE_API_KEY is missing in AI-Service/.env",
         )
 
-    if x_service_key != expected_key:
+    if not x_service_key or not hmac.compare_digest(x_service_key, expected_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid internal service key",
@@ -494,6 +505,39 @@ def health_check():
 # Protected extraction endpoint
 # -----------------------------
 
+def build_rule_based_extraction(
+    text: str,
+    location_hint: Optional[str],
+) -> ComplaintExtractionResult:
+    category = detect_category(text)
+    severity = detect_severity(text, category)
+    required_people = detect_required_people(text)
+    required_skills = detect_required_skills(category)
+
+    clarification_questions = build_clarification_questions(
+        text=text,
+        location_hint=location_hint,
+        required_people=required_people,
+    )
+
+    return ComplaintExtractionResult(
+        summary=build_summary(
+            text=text,
+            category=category,
+            severity=severity,
+            required_people=required_people,
+        ),
+        category=category,
+        severity=severity,
+        location_hint=location_hint,
+        required_people=required_people,
+        required_skills=required_skills,
+        needs_clarification=len(clarification_questions) > 0,
+        clarification_questions=clarification_questions,
+        processing_mode="rule_based_mvp",
+    )
+
+
 @app.post("/internal/complaints/extract")
 def extract_complaint(
     payload: ComplaintExtractionRequest,
@@ -501,33 +545,24 @@ def extract_complaint(
 ):
     verify_service_key(x_service_key)
 
-    category = detect_category(payload.text)
-    severity = detect_severity(payload.text, category)
-    required_people = detect_required_people(payload.text)
-    required_skills = detect_required_skills(category)
-
-    clarification_questions = build_clarification_questions(
-        text=payload.text,
-        location_hint=payload.location_hint,
-        required_people=required_people,
-    )
-
-    result = ComplaintExtractionResult(
-        summary=build_summary(
+    try:
+        extracted = openai_extraction_service.extract(
             text=payload.text,
-            category=category,
-            severity=severity,
-            required_people=required_people,
-        ),
-        category=category,
-        severity=severity,
-        location_hint=payload.location_hint,
-        required_people=required_people,
-        required_skills=required_skills,
-        needs_clarification=len(clarification_questions) > 0,
-        clarification_questions=clarification_questions,
-        processing_mode="rule_based_mvp",
-    )
+            location_hint=payload.location_hint,
+        )
+
+        result = ComplaintExtractionResult(**extracted)
+
+    except Exception as error:
+        print(
+            "⚠️ OpenAI extraction unavailable, falling back to rule-based "
+            f"extraction: {error}"
+        )
+
+        result = build_rule_based_extraction(
+            text=payload.text,
+            location_hint=payload.location_hint,
+        )
 
     return {
         "success": True,

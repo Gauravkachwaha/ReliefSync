@@ -55,7 +55,7 @@ class AiService {
     const normalizedLocation = this.normalizeForCache(locationHint);
 
     const cachePayload = {
-      cacheVersion: "rule_extraction_v1",
+      cacheVersion: "rule_extraction_v2",
       textSha256: aiWorkflowCacheService.hashText(normalizedText),
       locationHintSha256: aiWorkflowCacheService.hashText(normalizedLocation),
     };
@@ -68,33 +68,36 @@ class AiService {
         try {
           const response = await aiClient.post("/internal/complaints/extract", {
             text: rawText,
-            locationHint,
+            location_hint: locationHint,
           });
 
-          const data = response.data || {};
+          // The AI service wraps its payload as { success, data: {...} } —
+          // the actual extracted fields live one level down, in snake_case.
+          const data = response.data?.data || {};
+
+          const requiredPeople = Math.max(
+            1,
+            Number.parseInt(data.required_people, 10) || 1,
+          );
 
           return {
             ...data,
-            location: data.location || locationHint || null,
-            issueType: data.issueType || data.category || "GENERAL_SUPPORT",
-            affectedPeople: Math.max(
-              1,
-              Number.parseInt(
-                data.affectedPeople || data.requiredPeople || 1,
-                10,
-              ) || 1,
-            ),
-            urgencyHint: data.urgencyHint || data.severity || "MEDIUM",
-            requiredSkills: Array.isArray(data.requiredSkills)
-              ? data.requiredSkills
+            location: data.location_hint || locationHint || null,
+            category: data.category || "GENERAL_SUPPORT",
+            severity: data.severity || "MEDIUM",
+            issueType: data.category || "GENERAL_SUPPORT",
+            affectedPeople: requiredPeople,
+            urgencyHint: data.severity || "MEDIUM",
+            requiredSkills: Array.isArray(data.required_skills)
+              ? data.required_skills
               : [],
-            requiredVolunteers: Math.max(
-              1,
-              Number.parseInt(
-                data.requiredVolunteers || data.requiredPeople || 1,
-                10,
-              ) || 1,
-            ),
+            requiredVolunteers: requiredPeople,
+            needsClarification: Boolean(data.needs_clarification),
+            clarificationQuestions: Array.isArray(
+              data.clarification_questions,
+            )
+              ? data.clarification_questions
+              : [],
           };
         } catch (error) {
           throw this.getServiceError(error, "extract complaint information");
@@ -127,12 +130,13 @@ class AiService {
             "/internal/complaints/priority",
             {
               title,
-              rawText,
-              aiExtractedData,
+              raw_text: rawText,
+              ai_extracted_data: aiExtractedData,
             },
           );
 
-          return response.data;
+          // Same wrapper as extractStructuredData: { success, data: {...} }.
+          return response.data?.data || {};
         } catch (error) {
           throw this.getServiceError(error, "calculate complaint priority");
         }
@@ -161,10 +165,11 @@ class AiService {
           const response = await aiClient.post("/internal/needs/summary", {
             title,
             priority,
-            extractedData,
+            extracted_data: extractedData,
           });
 
-          return response.data;
+          // Same wrapper as extractStructuredData: { success, data: {...} }.
+          return response.data?.data || {};
         } catch (error) {
           throw this.getServiceError(error, "generate need summary");
         }

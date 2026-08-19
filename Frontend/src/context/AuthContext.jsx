@@ -1,10 +1,16 @@
-import React, { createContext, useContext, useCallback, useState } from "react";
+import React, { createContext, useContext, useCallback, useEffect, useState } from "react";
 import { api } from "../services/api";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => api.auth.getCurrentUser());
+
+  useEffect(() => {
+    const handleSessionExpiry = () => setUser(null);
+    window.addEventListener("reliefsync:logout", handleSessionExpiry);
+    return () => window.removeEventListener("reliefsync:logout", handleSessionExpiry);
+  }, []);
 
   const login = useCallback(async (email, password) => {
     const res = await api.auth.login(email, password);
@@ -36,6 +42,7 @@ export function useAuth() {
 
 export const ROLE_HOME = {
   admin: "/ngo",
+  coordinator: "/ngo",
   volunteer: "/volunteer",
   super_admin: "/admin",
 };

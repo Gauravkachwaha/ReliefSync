@@ -64,6 +64,16 @@ async function processBackgroundJob(job) {
     return result;
   }
 
+  if (job.name === "notifications.requeue-stuck") {
+    await job.updateProgress(10);
+
+    const result = await notificationService.requeueStuckNotifications();
+
+    await job.updateProgress(100);
+
+    return result;
+  }
+
   throw new Error(`Unsupported background job type: ${job.name}`);
 }
 

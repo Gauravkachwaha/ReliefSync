@@ -5,7 +5,6 @@ import NgoCaseOffer from "../models/NgoCaseOffer.js";
 import { getNgoOfferExpiryConfig } from "../config/ngoOfferExpiryConfig.js";
 import { getNgoRedispatchConfig } from "../config/ngoRedispatchConfig.js";
 import notificationService from "./notificationService.js";
-import emailService from "./emailService.js";
 
 const ROUTABLE_COMPLAINT_STATUSES = ["READY_FOR_ROUTING", "NGOS_NOTIFIED"];
 
@@ -259,25 +258,33 @@ class NgoRedispatchService {
     );
   }
 
+  buildNgoOfferEmailBody(complaint) {
+    return (
+      `🚨 NEW INCIDENT ROUTED TO YOUR NGO\n\n` +
+      `A new emergency complaint has been routed to your NGO by the ReliefSync AI engine.\n\n` +
+      `Complaint ID: ${complaint.complaintId}\n` +
+      `Category: ${complaint.category || "General"}\n` +
+      `Severity: ${complaint.severity || "Medium"}\n` +
+      `Location Landmark: ${complaint.locationHint || "General"}\n\n` +
+      `AI Case Summary:\n"${complaint.aiExtractedData?.summary || complaint.originalText || "No summary available."}"\n\n` +
+      `Please log in to your NGO Dashboard immediately to accept or decline this case offer before it expires.\n\n` +
+      `Thank you,\nReliefSync AI Team`
+    );
+  }
+
   async queueNgoOfferNotifications({
     complaint,
     dispatchWave,
     trigger,
     offers,
   }) {
-    // Send email alert to each NGO
-    for (const { ngo } of offers) {
-      if (ngo && ngo.email) {
-        emailService.sendIncidentOfferAlert(ngo.email, complaint).catch((err) => {
-          console.error(`❌ Background email during redispatch to ${ngo.email} failed:`, err.message);
-        });
-      }
-    }
-
     if (!this.isNgoOfferNotificationEnabled()) {
       return;
     }
 
+    // Routed entirely through the idempotent outbox (Path A) — including
+    // EMAIL — so NGO offer alerts get the same retry/audit guarantees as
+    // every other notification, instead of firing un-queued and un-retried.
     const results = await Promise.allSettled(
       offers.map(({ ngo, offer }) =>
         notificationService.createAndQueueNotification({
@@ -295,15 +302,11 @@ class NgoRedispatchService {
 
           ngoCaseOfferId: offer._id,
 
-          channel: "CONSOLE",
+          channel: ngo.email ? "EMAIL" : "CONSOLE",
 
-          subject: `New relief case offer: ${complaint.complaintId}`,
+          subject: `🚨 Urgent Case Offer: ${complaint.complaintId}`,
 
-          message:
-            `A ${complaint.severity || "MEDIUM"} priority ` +
-            `${complaint.category || "GENERAL_SUPPORT"} case ` +
-            `is available near ${complaint.locationHint || "the reported location"}. ` +
-            `Please respond before ${offer.expiresAt.toISOString()}.`,
+          message: this.buildNgoOfferEmailBody(complaint),
 
           payload: {
             complaintPublicId: complaint.complaintId,
@@ -313,6 +316,7 @@ class NgoRedispatchService {
             expiresAt: offer.expiresAt,
             dispatchWave,
             trigger,
+            recipientEmail: ngo.email || null,
           },
         }),
       ),
@@ -389,15 +393,10 @@ class NgoRedispatchService {
         (offer) => offer.ngoId,
       );
 
-      const verifiedNgos = await NGO.find({
-        verificationStatus: "VERIFIED",
-        _id: { $nin: previouslyOfferedNgoIds }
-      }).lean();
-
-      const rankedNgos = verifiedNgos.map(ngo => ({
-        ngo,
-        matchScore: 100
-      }));
+      const rankedNgos = await this.findRankedEligibleNgos(
+        lockedComplaint,
+        previouslyOfferedNgoIds,
+      );
 
       if (rankedNgos.length === 0) {
         console.log(
@@ -419,7 +418,11 @@ class NgoRedispatchService {
 
       const dispatchWave = maxPreviousWave + 1;
 
-      const nextWave = rankedNgos;
+      const batchSize = this.getOfferBatchSize(lockedComplaint.severity);
+
+      const nextWave = rankedNgos
+        .slice(0, batchSize)
+        .map(({ ngo, finalScore }) => ({ ngo, matchScore: finalScore }));
 
       const { offerExpiryMinutes } = getNgoOfferExpiryConfig();
 
@@ -430,7 +433,7 @@ class NgoRedispatchService {
       const nextNgoIds = nextWave.map(({ ngo }) => ngo._id);
 
       await NgoCaseOffer.bulkWrite(
-        nextWave.map(({ ngo }) => ({
+        nextWave.map(({ ngo, matchScore }) => ({
           updateOne: {
             filter: {
               complaintId: lockedComplaint._id,
@@ -445,6 +448,7 @@ class NgoRedispatchService {
                 expiresAt,
                 expiredAt: null,
                 dispatchWave,
+                matchScore,
                 // NOTE: Do NOT set createdAt/updatedAt here — NgoCaseOffer has
                 // timestamps: true so Mongoose auto-injects them. Manually setting
                 // updatedAt in $setOnInsert conflicts with Mongoose's $set injection.

@@ -1,6 +1,8 @@
 import notificationRepository from "../repositories/notificationRepository.js";
+import emailService from "./emailService.js";
 
 import { enqueueNotificationDelivery } from "../queues/reliefBackgroundQueue.js";
+import { getNotificationRequeueConfig } from "../config/notificationRequeueConfig.js";
 
 class NotificationService {
   getDefaultChannel() {
@@ -113,6 +115,8 @@ class NotificationService {
         await this.deliverConsoleNotification(notification);
       } else if (notification.channel === "IN_APP") {
         await this.deliverInAppNotification(notification);
+      } else if (notification.channel === "EMAIL") {
+        await this.deliverEmailNotification(notification);
       } else {
         throw new Error(
           `Channel ${notification.channel} is not implemented yet`,
@@ -164,6 +168,75 @@ class NotificationService {
 
   async deliverInAppNotification(notification) {
     console.log(`📥 In-app notification stored: ${notification.type}`);
+  }
+
+  // Recurring sweep for notifications whose original enqueue attempt threw
+  // (e.g. a brief Redis outage): they were persisted with status "QUEUED"
+  // but never got a bullMqJobId, so nothing would otherwise ever retry
+  // queuing them.
+  async requeueStuckNotifications() {
+    const { graceMs, batchSize } = getNotificationRequeueConfig();
+
+    const cutoffDate = new Date(Date.now() - graceMs);
+
+    const stuckNotifications = await notificationRepository.findStuckQueued(
+      cutoffDate,
+      batchSize,
+    );
+
+    let requeuedCount = 0;
+    let skippedCount = 0;
+
+    for (const notification of stuckNotifications) {
+      try {
+        const job = await enqueueNotificationDelivery({
+          notificationId: notification._id,
+          notificationType: notification.type,
+          jobId: this.buildDeliveryJobId(notification._id),
+        });
+
+        await notificationRepository.saveBullMqJobId(
+          notification._id,
+          job.id,
+        );
+
+        requeuedCount += 1;
+      } catch (error) {
+        skippedCount += 1;
+
+        console.warn(
+          `⚠️ Stuck notification ${notification._id} could not be requeued: ${error.message}`,
+        );
+      }
+    }
+
+    console.log(
+      `🔁 Notification requeue sweep complete. Checked=${stuckNotifications.length}, Requeued=${requeuedCount}, Skipped=${skippedCount}`,
+    );
+
+    return {
+      checkedCount: stuckNotifications.length,
+      requeuedCount,
+      skippedCount,
+      processedAt: new Date().toISOString(),
+    };
+  }
+
+  async deliverEmailNotification(notification) {
+    const recipientEmail = notification.payload?.recipientEmail;
+
+    if (!recipientEmail) {
+      throw new Error(
+        "Notification is missing payload.recipientEmail for the EMAIL channel",
+      );
+    }
+
+    await emailService.sendEmail(
+      recipientEmail,
+      notification.subject,
+      notification.message,
+      { throwOnFailure: true },
+    );
   }
 }
 

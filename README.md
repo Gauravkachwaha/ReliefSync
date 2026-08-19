@@ -22,10 +22,11 @@ During a crisis, reports arrive messy, duplicated, and at volume. **ReliefSync A
 
 1. Screens them for spam, with **emergency language always protected from auto-blocking**
 2. Detects duplicates by *meaning*, not just exact text, using multilingual sentence embeddings
-3. Classifies category and severity with a hybrid of deterministic rules and a zero-shot ML model
-4. Routes the case to **verified NGOs** in waves, with automatic expiry and redispatch if nobody responds
-5. Matches and offers the case to suitable **volunteers** once an NGO accepts
-6. Notifies everyone involved and **escalates to a human coordinator** when automation hits a dead end
+3. Extracts structured fields (category, severity, skills needed) with an LLM-backed extractor that falls back to deterministic rule-based extraction if the LLM call fails
+4. Classifies category and severity with a hybrid of deterministic rules and a zero-shot ML model
+5. Routes the case to **verified NGOs** in waves, with automatic expiry and redispatch if nobody responds
+6. Matches and offers the case to suitable **volunteers** once an NGO accepts
+7. Notifies everyone involved and **escalates to a human coordinator** when automation hits a dead end
 
 Every AI decision is conservative by design: models suggest, rules and humans stay in control of anything high-stakes. Every step is logged, so the full lifecycle of a complaint is auditable end to end.
 
@@ -46,6 +47,7 @@ Every AI decision is conservative by design: models suggest, rules and humans st
 - Hybrid decision policy — a model alone can never silently block an emergency-sounding report
 - Semantic duplicate detection via `intfloat/multilingual-e5-small` embeddings, catching reworded duplicates exact-match would miss
 - Category & severity classification blending deterministic rules with a multilingual zero-shot classifier; severity can be raised automatically but never silently lowered
+- LLM-backed field extraction (OpenAI, `gpt-4o-mini`) for messy English/Hindi complaint text, with an automatic deterministic-rules fallback if the LLM call fails or is disabled
 
 </td>
 <td width="50%" valign="top">
@@ -109,7 +111,7 @@ graph TD
     API["Express API Gateway<br/>(auth, routing, business rules)"]:::server
     Mongo[("MongoDB<br/>complaints, offers, assignments, logs")]:::db
     Redis[("Redis<br/>cache + BullMQ queues")]:::db
-    AI["FastAPI AI Microservice<br/>(spam · embeddings · classification)"]:::ai
+    AI["FastAPI AI Microservice<br/>(spam · embeddings · classification · LLM extraction)"]:::ai
     Worker["Background Workers<br/>expiry · redispatch · notifications · escalation"]:::worker
 
     Public -->|Submit / Track| API
@@ -133,7 +135,7 @@ graph TD
 | :--- | :--- | :--- |
 | **Frontend** | React 19, React Router, TanStack Query, Tailwind CSS v4, Vite | Role-based dashboards (public, NGO, volunteer, super admin) with real URL routing, live data caching, and a warm editorial design system |
 | **Backend API** | Node.js, Express 5, JWT, Mongoose | Auth, business rules, atomic routing/matching logic, all database writes |
-| **AI Microservice** | FastAPI, PyTorch, Hugging Face Transformers | Spam classification, multilingual duplicate embeddings, zero-shot category/severity classification |
+| **AI Microservice** | FastAPI, PyTorch, Hugging Face Transformers, OpenAI API | Spam classification, multilingual duplicate embeddings, zero-shot category/severity classification, LLM-backed field extraction with rule-based fallback |
 | **Data** | MongoDB, Redis | MongoDB for durable state; Redis for model-output caching and BullMQ job queues |
 | **Background Jobs** | BullMQ | Offer expiry sweeps, redispatch waves, notification delivery, escalation sweeps |
 | **Notifications** | Nodemailer (SMTP), console/in-app outbox | Idempotent notification log with pluggable channels |
@@ -175,7 +177,7 @@ ReliefSync-AI/
 │       └── config/              # DB, Redis/BullMQ, offer expiry & redispatch tuning
 ├── AI-Service/                  # FastAPI ML microservice
 │   ├── routes/                  # spam_model · embedding_model · complaint_classifier · cache
-│   └── services/                # Model loading, inference, Redis-backed result caching
+│   └── services/                # Model loading, inference, OpenAI extraction/classification, Redis-backed result caching
 └── assets/                      # README media
 ```
 
@@ -220,6 +222,12 @@ AI_SERVICE_API_KEY=your_internal_fastapi_secret
 SPAM_MODEL_ENABLED=true
 EMBEDDING_MODEL_ENABLED=true
 COMPLAINT_CLASSIFIER_ENABLED=true
+
+# OpenAI-backed extraction + classification (optional — falls back to rule-based extraction if unset/unavailable)
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL_NAME=gpt-4o-mini
+OPENAI_EXTRACTION_ENABLED=true
+OPENAI_CLASSIFIER_ENABLED=true
 ```
 </details>
 
@@ -272,7 +280,7 @@ Open **http://localhost:5173** — the login page has one-click demo credential 
 
 ## ☁️ Deployment
 
-The stack is split into 5 deployable pieces: **Frontend** (Vercel), **Backend API + 2 background workers** (Render), **AI microservice** (Render), **MongoDB** (Atlas), **Redis** (Upstash). A `render.yaml` blueprint at the repo root deploys the four Render services in one shot.
+The stack is split into 5 deployable pieces: **Frontend** (Vercel), **Backend API + 2 background workers** (Render), **AI microservice** (Render), **MongoDB** (Atlas), **Redis** (Upstash).
 
 <details>
 <summary><b>Step-by-step</b></summary>
@@ -281,11 +289,11 @@ The stack is split into 5 deployable pieces: **Frontend** (Vercel), **Backend AP
 - [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register) → create a free M0 cluster → get the connection string (this is your `MONGO_URL`)
 - [Upstash](https://upstash.com/) → create a free Redis database → get the `rediss://…` connection string (this is your `BACKEND_REDIS_URL` / `REDIS_URL`)
 
-**2. Backend + workers + AI service, via Render Blueprint**
+**2. Backend + workers + AI service, on Render**
 - Push this repo to GitHub
-- In Render: **New → Blueprint**, select the repo — it reads `render.yaml` and proposes 4 services (`reliefsync-backend`, `reliefsync-worker`, `reliefsync-escalation-worker`, `reliefsync-ai-service`)
-- Note: the AI service is on the `starter` plan, not free — it loads PyTorch/Transformer models that don't fit in 512MB
-- After the first deploy, fill in the env vars marked "sync: false" in the Render dashboard for each service: your Atlas `MONGO_URL`, Upstash `BACKEND_REDIS_URL`/`REDIS_URL`, a shared `AI_SERVICE_API_KEY` (make one up, use the same value on both `reliefsync-backend` and `reliefsync-ai-service`), `AI_SERVICE_URL` (the AI service's own `https://reliefsync-ai-service.onrender.com` URL), and SMTP creds if you want real emails
+- In Render: create 4 services from the repo — a Web Service for `reliefsync-backend` (root `Backend/`, `npm install`, `npm start`), two Background Workers for `reliefsync-worker` (`npm run worker`) and `reliefsync-escalation-worker` (`npm run escalation-worker`), and a Web Service for `reliefsync-ai-service` (root `AI-Service/`, `pip install -r requirements.txt`, `uvicorn main:app --host 0.0.0.0 --port $PORT`)
+- Note: the AI service needs at least the `starter` plan, not free — it loads PyTorch/Transformer models that don't fit in 512MB
+- Fill in each service's env vars from the `.env` templates above: your Atlas `MONGO_URL`, Upstash `BACKEND_REDIS_URL`/`REDIS_URL`, a shared `AI_SERVICE_API_KEY` (make one up, use the same value on both `reliefsync-backend` and `reliefsync-ai-service`), `AI_SERVICE_URL` (the AI service's own `https://reliefsync-ai-service.onrender.com` URL), and SMTP/OpenAI creds if you want real emails and LLM-backed extraction
 - Leave `FRONTEND_URL` blank for now — you'll fill it in after step 3
 
 **3. Frontend, on Vercel**

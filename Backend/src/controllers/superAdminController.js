@@ -7,6 +7,7 @@ import NGO from "../models/NGO.js";
 import Volunteer from "../models/Volunteer.js";
 import complaintService from "../services/complaintService.js";
 import ngoRedispatchService from "../services/ngoRedispatchService.js";
+import fingerprintClaimService from "../services/fingerprintClaimService.js";
 
 const allowedVerificationStatuses = ["PENDING", "VERIFIED", "REJECTED"];
 
@@ -130,6 +131,11 @@ const resolveSpamReview = async (req, res, next) => {
       complaint.finalSpamDecision = "BLOCK";
       complaint.status = "BLOCKED";
       await complaint.save();
+
+      await fingerprintClaimService.release(
+        complaint.contentFingerprint,
+        complaint.complaintId,
+      );
     }
 
     res.json({

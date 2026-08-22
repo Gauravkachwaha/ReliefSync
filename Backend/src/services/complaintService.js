@@ -4,6 +4,7 @@ import complaintRepository from "../repositories/complaintRepository.js";
 import spamService from "./spamService.js";
 import complaintSpamScreeningService from "./complaintSpamScreeningService.js";
 import semanticDuplicateService from "./semanticDuplicateService.js";
+import fingerprintClaimService from "./fingerprintClaimService.js";
 import aiService from "./aiService.js";
 import ngoRedispatchService from "./ngoRedispatchService.js";
 import agentLogService from "./agentLogService.js";
@@ -202,6 +203,46 @@ class ComplaintService {
       semanticDuplicateScore: 1,
       semanticDuplicateCheckedAt: new Date(),
     };
+  }
+
+  // Decides whether this submission is an exact-fingerprint duplicate,
+  // using an atomic Redis claim so two simultaneous identical submissions
+  // can't both read "no duplicate" before either has written to Mongo.
+  async resolveFingerprintDuplicate(contentFingerprint, complaintId) {
+    const claimResult = await fingerprintClaimService.claim(
+      contentFingerprint,
+      complaintId,
+    );
+
+    if (!claimResult.redisAvailable) {
+      // Redis is down — fall back to the old check-then-write query.
+      // This reintroduces the race only for the duration of the outage.
+      const duplicateSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      return await complaintRepository.findRecentByContentFingerprint(
+        contentFingerprint,
+        duplicateSince,
+      );
+    }
+
+    if (claimResult.wonClaim) {
+      return null;
+    }
+
+    const duplicateComplaint = await complaintRepository.findByComplaintId(
+      claimResult.ownerComplaintId,
+    );
+
+    if (duplicateComplaint) {
+      return duplicateComplaint;
+    }
+
+    // The claim's owner doesn't exist in Mongo (e.g. it crashed before
+    // writing). Fail open: take over the claim and treat this submission
+    // as the original instead of blocking it on a ghost owner.
+    await fingerprintClaimService.reassign(contentFingerprint, complaintId);
+
+    return null;
   }
 
   getPublicMessage(status) {
@@ -461,13 +502,14 @@ class ComplaintService {
       cleanLocationHint,
     );
 
-    const duplicateSince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Generated up front so it can be used as the Redis claim's value —
+    // whichever request wins the atomic claim below owns this ID.
+    const complaintId = await this.generateUniqueComplaintId();
 
-    const duplicateComplaint =
-      await complaintRepository.findRecentByContentFingerprint(
-        contentFingerprint,
-        duplicateSince,
-      );
+    const duplicateComplaint = await this.resolveFingerprintDuplicate(
+      contentFingerprint,
+      complaintId,
+    );
 
     let screeningResult;
     let semanticResult;
@@ -535,8 +577,6 @@ class ComplaintService {
       }
     }
 
-    const complaintId = await this.generateUniqueComplaintId();
-
     const trackingToken = crypto.randomBytes(32).toString("hex");
 
     let complaint = await complaintRepository.create({
@@ -577,6 +617,14 @@ class ComplaintService {
       duplicateOfComplaintId,
       status: complaintStatus,
     });
+
+    if (!duplicateComplaint && complaintStatus === "BLOCKED") {
+      // A blocked complaint doesn't count as "the original" for dedupe
+      // purposes (mirrors the BLOCKED exclusion in the Mongo fallback
+      // query) — free the fingerprint immediately instead of holding it
+      // for the rest of the 24h claim window.
+      await fingerprintClaimService.release(contentFingerprint, complaintId);
+    }
 
     const canContinueAutomatically =
       !duplicateComplaint &&

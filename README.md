@@ -8,7 +8,8 @@
 [![Node](https://img.shields.io/badge/Node.js-20+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](#)
 [![React](https://img.shields.io/badge/React-19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](#)
 [![FastAPI](https://img.shields.io/badge/FastAPI-Python%203-005571?style=for-the-badge&logo=fastapi&logoColor=white)](#)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](#)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](#)
+[![Redis](https://img.shields.io/badge/Redis-Cache%20%2B%20Queues-DC382D?style=for-the-badge&logo=redis&logoColor=white)](#)
 
 [Overview](#-overview) • [Features](#-what-it-does) • [Architecture](#-architecture) • [Tech Stack](#%EF%B8%8F-tech-stack) • [Design](#-design-language) • [Getting Started](#-getting-started) • [Deployment](#%EF%B8%8F-deployment) • [API Surface](#-api-surface) • [Roadmap](#-roadmap)
 
@@ -66,6 +67,7 @@ Every AI decision is conservative by design: models suggest, rules and humans st
 ### ⏱️ Background Reliability
 - BullMQ + Redis workers handle offer expiry, redispatch waves, notification delivery, and escalation sweeps off the request path
 - Redis also caches AI model outputs and workflow calls — and **fails open**, so a Redis outage degrades gracefully instead of breaking submissions
+- Redis also arbitrates exact-duplicate complaints atomically (`SET NX EX`) — two identical submissions arriving at the same instant can't both slip past the fingerprint check, with an automatic fallback to the old database check if Redis is unavailable
 - Idempotent notification outbox — the same event can never fire two duplicate alerts
 
 </td>
@@ -73,6 +75,8 @@ Every AI decision is conservative by design: models suggest, rules and humans st
 
 ### 🧭 Full Coordination Loop
 - Secure, tokenized complaint tracking for anonymous citizens (raw token never touches the database — only its hash)
+- Automatic escalation to a human coordinator when automation can't resolve a case on its own — no eligible NGO, an offer nobody accepted before its SLA, a stalled assignment — each with a specific, filterable reason code
+- Short-lived JWT access tokens plus rotated, hashed refresh sessions (HttpOnly cookie) — a stolen access token is worthless within minutes, and replaying a used refresh token is rejected
 - NGO dashboard: case offers, AI volunteer matching, roster management, task allocations, situation reports, routing settings
 - Volunteer portal: availability switch, offers, live per-task progress logging
 - Super Admin console: NGO verification, spam review queue, escalations, and a full AI agent + notification audit trail
@@ -110,7 +114,7 @@ graph TD
 
     API["Express API Gateway<br/>(auth, routing, business rules)"]:::server
     Mongo[("MongoDB<br/>complaints, offers, assignments, logs")]:::db
-    Redis[("Redis<br/>cache + BullMQ queues")]:::db
+    Redis[("Redis<br/>cache + dedupe claims + BullMQ queues")]:::db
     AI["FastAPI AI Microservice<br/>(spam · embeddings · classification · LLM extraction)"]:::ai
     Worker["Background Workers<br/>expiry · redispatch · notifications · escalation"]:::worker
 
@@ -136,7 +140,7 @@ graph TD
 | **Frontend** | React 19, React Router, TanStack Query, Tailwind CSS v4, Vite | Role-based dashboards (public, NGO, volunteer, super admin) with real URL routing, live data caching, and a warm editorial design system |
 | **Backend API** | Node.js, Express 5, JWT, Mongoose | Auth, business rules, atomic routing/matching logic, all database writes |
 | **AI Microservice** | FastAPI, PyTorch, Hugging Face Transformers, OpenAI API | Spam classification, multilingual duplicate embeddings, zero-shot category/severity classification, LLM-backed field extraction with rule-based fallback |
-| **Data** | MongoDB, Redis | MongoDB for durable state; Redis for model-output caching and BullMQ job queues |
+| **Data** | MongoDB, Redis | MongoDB for durable state; Redis for model-output caching, atomic exact-duplicate claims, and BullMQ job queues |
 | **Background Jobs** | BullMQ | Offer expiry sweeps, redispatch waves, notification delivery, escalation sweeps |
 | **Notifications** | Nodemailer (SMTP), console/in-app outbox | Idempotent notification log with pluggable channels |
 
@@ -330,7 +334,7 @@ Full request/response contracts are documented inline in each route's controller
 
 ## 🗺️ Roadmap
 
-- [ ] **Automated test suite** — spam/emergency-protection cases, race conditions on NGO acceptance, redispatch idempotency, Redis fail-open behavior
+- [ ] **Automated test suite** — spam/emergency-protection cases, race conditions on NGO acceptance, redispatch idempotency, concurrent-submission fingerprint claiming, Redis fail-open behavior
 - [ ] **GIS-based matching** — real geospatial distance instead of text-based location matching
 - [ ] **Offline-capable public intake** — PWA support for drafting reports without connectivity
 - [ ] **Vector search engine migration** — move duplicate/similarity search to a dedicated vector store (Qdrant/pgvector) as volume grows

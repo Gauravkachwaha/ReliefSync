@@ -11,9 +11,22 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](#)
 [![Redis](https://img.shields.io/badge/Redis-Cache%20%2B%20Queues-DC382D?style=for-the-badge&logo=redis&logoColor=white)](#)
 
-[Overview](#-overview) • [Features](#-what-it-does) • [Architecture](#-architecture) • [Tech Stack](#%EF%B8%8F-tech-stack) • [Design](#-design-language) • [Getting Started](#-getting-started) • [Deployment](#%EF%B8%8F-deployment) • [API Surface](#-api-surface) • [Roadmap](#-roadmap)
+[Overview](#-overview) • [Features](#-what-it-does) • [Architecture](#-architecture) • [Lifecycle](#-complaint-lifecycle) • [Tech Stack](#%EF%B8%8F-tech-stack) • [Design](#-design-language) • [Getting Started](#-getting-started) • [Deployment](#%EF%B8%8F-deployment) • [API Surface](#-api-surface) • [Roadmap](#-roadmap)
 
 </div>
+
+---
+
+> **⚡ Quick start**
+> ```bash
+> git clone <this-repo> && cd ReliefSync-AI
+> # fill in the three .env files (see Getting Started ↓)
+> cd Backend && npm install && node scripts/createDemoData.js && node scripts/createSuperAdmin.js
+> cd ../AI-Service && python -m venv .venv && pip install -r requirements.txt
+> cd ../Frontend && npm install
+> # then run Redis, AI-Service, Backend, and Frontend each in their own terminal
+> ```
+> Full walkthrough (env vars, seeding, run commands) is in [Getting Started](#-getting-started).
 
 ---
 
@@ -33,6 +46,7 @@ Every AI decision is conservative by design: models suggest, rules and humans st
 
 <p align="center">
   <img src="assets/screenshot-landing.png" alt="Public landing page" width="90%" />
+  <br/><sub>The public landing page — report an emergency or track an existing one, no account required.</sub>
 </p>
 
 ---
@@ -88,9 +102,11 @@ Every AI decision is conservative by design: models suggest, rules and humans st
 <p align="center">
   <img src="assets/screenshot-ngo-dashboard.png" alt="NGO dashboard" width="49%" />
   <img src="assets/screenshot-admin-spam.png" alt="Super admin spam review queue" width="49%" />
+  <br/><sub>Left: an NGO's case-offer dashboard. Right: the Super Admin spam review queue.</sub>
 </p>
 <p align="center">
   <img src="assets/screenshot-volunteer-offers.png" alt="Volunteer portal home" width="70%" />
+  <br/><sub>The volunteer portal — availability, live offers, and per-task progress.</sub>
 </p>
 
 ---
@@ -130,6 +146,43 @@ graph TD
     Redis -->|Jobs claimed| Worker
     Worker -->|Status updates| Mongo
 ```
+
+---
+
+## 🔄 Complaint Lifecycle
+
+Every complaint is a single document that moves through a strict state machine (`Complaint.status`) — nothing is inferred from side tables, so any admin can look at one record and know exactly where a case stands and why.
+
+```mermaid
+stateDiagram-v2
+    [*] --> SUBMITTED
+    SUBMITTED --> BLOCKED: spam-screened out
+    SUBMITTED --> REVIEW_REQUIRED: borderline spam / policy conflict
+    SUBMITTED --> DUPLICATE: matches an existing case
+    SUBMITTED --> PROCESSING: passed spam + duplicate checks
+    PROCESSING --> NEEDS_CLARIFICATION: extractor couldn't fill required fields
+    PROCESSING --> READY_FOR_ROUTING: category + severity resolved
+    READY_FOR_ROUTING --> NGOS_NOTIFIED: wave 1 offers sent to ranked NGOs
+    NGOS_NOTIFIED --> NGOS_NOTIFIED: wave expires, unaccepted → redispatch to next wave
+    NGOS_NOTIFIED --> NGO_ACCEPTED: an NGO claims the case
+    NGO_ACCEPTED --> VOLUNTEER_MATCHING: ranked volunteer offers sent
+    VOLUNTEER_MATCHING --> PARTIALLY_ASSIGNED: some seats filled
+    VOLUNTEER_MATCHING --> FULLY_ASSIGNED: all seats filled
+    PARTIALLY_ASSIGNED --> FULLY_ASSIGNED
+    FULLY_ASSIGNED --> IN_PROGRESS
+    IN_PROGRESS --> RESOLVED
+    NGOS_NOTIFIED --> [*]: no eligible NGO → Escalation(NO_ELIGIBLE_NGO)
+    VOLUNTEER_MATCHING --> [*]: no eligible volunteer → Escalation(NO_ELIGIBLE_VOLUNTEER)
+    SUBMITTED --> REJECTED_AS_SPAM
+    PROCESSING --> CANCELLED
+```
+
+A few mechanics worth calling out, since they're the parts that are easy to get wrong in a dispatch system like this:
+
+- **Offer waves, not a broadcast.** Each `NgoCaseOffer` / `VolunteerOffer` carries a `dispatchWave` number and a `matchScore`. Wave 1 goes only to the top-ranked eligible candidates; if none accept before the SLA, `ngoRedispatchService` / `volunteerMatchingService` opens the next wave against the *next* tier — so a low-capacity NGO ten waves away doesn't get paged before a well-matched one two blocks away has had a chance to respond.
+- **One active escalation per reason.** `Escalation` has a partial unique index on `(complaintId, reason, isActive: true)` — so the redispatch sweep can run repeatedly without ever creating duplicate escalations for the same stuck case.
+- **The classification audit trail is append-only.** `finalCategorySource` / `finalSeveritySource` record whether the *live* category/severity came from `RULE`, `ML`, or a human `MANUAL` override, while the raw `mlPredictedCategory`, `mlCategoryConfidence`, and `classificationPolicyStatus` fields are kept alongside — even when the rule-based value wins — so a reviewer can always see what the model *would have* said.
+- **Guest tracking never stores the raw token.** `guestTrackingTokenHash` is the only thing persisted; the token itself is handed to the citizen once at submission time and never written to the database in plaintext.
 
 ---
 
